@@ -102,14 +102,17 @@ app.use(express.json({ limit: '10mb' }));
 // Enable CORS
 app.use(cors());
 
-// Serve static files with caching
+// Serve static files.
+// The page, scripts and styles are not fingerprinted, so they must be revalidated on every load
+// (cheap: the ETag turns an unchanged file into a 304). A long cache here meant that right after a
+// deploy people could run new HTML with old scripts, or the other way round, for up to an hour.
+// Images, fonts and the floor plan drawings can be cached for an hour.
 app.use(express.static('public', {
     maxAge: '1h',
     etag: true,
     setHeaders: (res, filePath) => {
-        // Longer cache for immutable assets (if you add hashed filenames)
-        if (filePath.endsWith('.css') || filePath.endsWith('.js')) {
-            res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hour
+        if (/\.(html|css|js|mjs)$/i.test(filePath)) {
+            res.setHeader('Cache-Control', 'no-cache');
         }
     }
 }));
@@ -165,7 +168,7 @@ app.get('/api/checkin/:qrCode', async (req, res) => {
             .eq('id', desk.location_id)
             .single();
         
-        const today = new Date().toISOString().split('T')[0];
+        const today = require('./utils/dates').todayInOffice();
         const { data: todayBookings } = await supabase
             .from('desk_bookings')
             .select('*')

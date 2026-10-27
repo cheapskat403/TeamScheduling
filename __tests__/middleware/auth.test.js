@@ -1,6 +1,9 @@
 /**
  * Tests for authentication middleware
  */
+// jwks-rsa v4 depends on ESM-only `jose`, which Jest can't parse; JWKS isn't exercised here
+jest.mock('jwks-rsa', () => jest.fn());
+
 const { extractToken } = require('../../middleware/auth');
 const { requireAuthForWrites, requireAuth } = require('../../middleware/requireAuth');
 

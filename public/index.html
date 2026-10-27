@@ -6,7 +6,10 @@
     <title>Office Booking System</title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FF6B35' stroke-width='2'%3E%3Cpath d='M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/%3E%3Cpolyline points='9 22 9 12 15 12 15 22'/%3E%3C/svg%3E">
+    <!-- Icons: PNG first, SVG last (Chrome takes the last icon it understands) -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     
     <!-- Preconnect for performance -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -65,6 +68,31 @@
     </noscript>
 </head>
 <body>
+    <!-- Company logo, defined once and reused with <use href="#digiata-logo"> -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+        <symbol id="digiata-logo" viewBox="4.6 1.9 95 16.4">
+            <path d="M36.1612 10.2794C36.1015 10.2263 36.0317 10.1858 35.9561 10.1602C35.8804 10.1347 35.8004 10.1246 35.7207 10.1306H35.5243V10.3449C35.5243 13.7973 33.5302 15.3746 33.5005 15.3985C32.3274 16.3227 30.8748 16.8202 29.3814 16.8092H25.4528V10.1306H25.2326C25.151 10.1249 25.0691 10.136 24.992 10.1634C24.9149 10.1907 24.8443 10.2336 24.7845 10.2895C24.7247 10.3453 24.6771 10.4129 24.6447 10.488C24.6122 10.5631 24.5955 10.644 24.5957 10.7258V17.6901H29.4588C29.5838 17.6901 32.6136 17.6901 34.5183 15.6366C35.6922 14.2983 36.347 12.5833 36.3636 10.8032C36.3755 10.706 36.3633 10.6073 36.328 10.5159C36.2927 10.4246 36.2354 10.3433 36.1612 10.2794Z" fill="#FFF9EC"></path>
+            <path d="M40.0068 10.7028V17.673H40.2271C40.3844 17.6755 40.5364 17.6156 40.6497 17.5064C40.7736 17.3643 40.8432 17.1829 40.8461 16.9945V10.1314H40.6259C40.5477 10.1282 40.4697 10.1404 40.3962 10.1674C40.3228 10.1944 40.2554 10.2356 40.1979 10.2887C40.1404 10.3418 40.0939 10.4057 40.0611 10.4767C40.0284 10.5478 40.0099 10.6246 40.0068 10.7028Z" fill="#FFF9EC"></path>
+            <path d="M34.7432 4.2203C33.011 2.0953 30.1836 2.19054 30.0705 2.19649H24.6182V9.19649C24.6182 9.35436 24.6809 9.50576 24.7925 9.61739C24.9041 9.72902 25.0555 9.79173 25.2134 9.79173H25.4396V3.02983H29.8801C33.0229 3.02983 34.2253 4.91078 34.2848 5.00602C35.6003 6.79173 35.517 9.54173 35.511 9.56554V9.79768H35.7372C35.8248 9.80254 35.9124 9.78798 35.9936 9.75505C36.0749 9.72213 36.1479 9.67164 36.2075 9.60721C36.3119 9.48498 36.3651 9.32723 36.3563 9.16673C36.3775 7.38534 35.8105 5.6467 34.7432 4.2203Z" fill="#FFF9EC"></path>
+            <path d="M40.2211 2.19629H40.0068V9.23796C40.0159 9.38955 40.0827 9.53193 40.1933 9.63595C40.304 9.73997 40.4502 9.79775 40.6021 9.79748H40.8283V2.86891C40.8321 2.77701 40.8171 2.68529 40.7844 2.59934C40.7516 2.51339 40.7018 2.43499 40.6378 2.36891C40.5243 2.26294 40.3763 2.20162 40.2211 2.19629Z" fill="#FFF9EC"></path>
+            <path d="M55.8095 10.2501C55.6877 10.3882 55.62 10.5658 55.619 10.7501V16.8155H51.6309C50.7623 16.8399 49.8989 16.6722 49.1026 16.3244C48.3062 15.9766 47.5964 15.4573 47.0238 14.8036C45.4524 13.0596 45.5476 10.3274 45.5476 10.3036V10.0715H45.3214C45.2411 10.0694 45.1612 10.0837 45.0865 10.1133C45.0118 10.143 44.9439 10.1875 44.8869 10.2441C44.767 10.3783 44.7013 10.5523 44.7024 10.7322C44.6888 12.4782 45.3084 14.1699 46.4464 15.4941C47.1064 16.1769 47.8958 16.7213 48.7687 17.0953C49.6415 17.4694 50.5802 17.6657 51.5297 17.6727H56.4702V10.0715H56.25C56.1682 10.0694 56.0869 10.0842 56.0112 10.1149C55.9354 10.1456 55.8667 10.1916 55.8095 10.2501Z" fill="#FFF9EC"></path>
+            <path d="M44.9105 9.58371C45.0197 9.68293 45.1618 9.73808 45.3093 9.73847H45.345H45.5355V8.99442C45.6188 6.09561 47.0415 4.67299 47.0712 4.64323C48.4462 2.94085 51.1903 3.05394 51.2379 3.05394H55.4046C55.4867 3.05795 55.5687 3.04572 55.6461 3.01795C55.7235 2.99019 55.7946 2.94744 55.8554 2.89215C55.9162 2.83686 55.9656 2.77011 56.0005 2.69574C56.0355 2.62136 56.0555 2.54081 56.0593 2.45871V2.22656H51.1188C47.6784 2.22656 46.2915 4.29799 46.2498 4.36942C44.6903 6.20275 44.7081 8.97656 44.7081 9.08966C44.7064 9.18146 44.7234 9.27265 44.7582 9.35762C44.793 9.44259 44.8448 9.51953 44.9105 9.58371Z" fill="#FFF9EC"></path>
+            <path d="M81.5479 10.7023V17.6726H82.405V10.1309H82.1848C82.1051 10.1252 82.0252 10.1357 81.9496 10.1616C81.8741 10.1874 81.8046 10.2283 81.7452 10.2816C81.6857 10.3349 81.6377 10.3996 81.6038 10.4719C81.5699 10.5442 81.5508 10.6225 81.5479 10.7023Z" fill="#FFF9EC"></path>
+            <path d="M87.6725 2.41085V2.17871H76.3451V2.39895C76.3422 2.48169 76.3566 2.56413 76.3873 2.641C76.4181 2.71787 76.4645 2.78748 76.5237 2.84538C76.6536 2.96446 76.8236 3.03032 76.9999 3.0299H81.5475V9.1549C81.5426 9.24247 81.5572 9.33004 81.5901 9.41133C81.623 9.49262 81.6735 9.56563 81.738 9.62514C81.8569 9.73301 82.0119 9.79247 82.1725 9.79181H82.2022H82.4046V3.0299H86.9284C87.1092 3.04645 87.2891 2.99053 87.4286 2.87444C87.5682 2.75835 87.6559 2.5916 87.6725 2.41085Z" fill="#FFF9EC"></path>
+            <path d="M89.2852 10.7261L86.4697 17.6725H86.7912C86.9739 17.6581 87.1496 17.5953 87.3002 17.4907C87.4508 17.3862 87.5709 17.2435 87.6483 17.0773L90.4281 10.1309H90.1066C89.9261 10.1374 89.7516 10.1975 89.6054 10.3035C89.4591 10.4095 89.3477 10.5566 89.2852 10.7261Z" fill="#FFF9EC"></path>
+            <path d="M95.6258 9.79748C95.7081 9.80216 95.7903 9.78736 95.8658 9.75426C95.9413 9.72116 96.008 9.67071 96.0603 9.607C96.1075 9.53261 96.1387 9.44923 96.1521 9.36214C96.1654 9.27505 96.1605 9.18615 96.1377 9.10105L93.4174 2.19629H92.5841L92.5305 2.33319L89.7686 9.11891C89.7327 9.18568 89.7139 9.26033 89.7139 9.33617C89.7139 9.41201 89.7327 9.48666 89.7686 9.55343C89.821 9.62348 89.8881 9.68112 89.9653 9.72227C90.0425 9.76342 90.1277 9.78707 90.2151 9.79153H90.3758L92.9651 3.37486L95.4591 9.78557L95.6258 9.79748Z" fill="#FFF9EC"></path>
+            <path d="M96.625 10.7976C96.5709 10.6122 96.4581 10.4493 96.3035 10.3334C96.149 10.2174 95.961 10.1548 95.7678 10.1548H95.4404L98.1785 17.0715C98.2435 17.2428 98.358 17.3909 98.5075 17.4969C98.657 17.6029 98.8346 17.662 99.0178 17.6667H99.3392L96.625 10.7976Z" fill="#FFF9EC"></path>
+            <path d="M60.3809 10.7026V17.6728H60.5951C60.7525 17.6753 60.9045 17.6154 61.0178 17.5061C61.1417 17.3641 61.2113 17.1827 61.2142 16.9942V10.1311H60.994C60.8371 10.1263 60.6846 10.1836 60.5698 10.2907C60.455 10.3977 60.3871 10.5457 60.3809 10.7026Z" fill="#FFF9EC"></path>
+            <path d="M60.5951 2.19629H60.3809V9.23796C60.39 9.38955 60.4567 9.53193 60.5673 9.63595C60.678 9.73997 60.8242 9.79775 60.9761 9.79748H61.2023V2.86891C61.2075 2.77685 61.1933 2.68473 61.1605 2.59856C61.1276 2.5124 61.077 2.43414 61.0118 2.36891C60.8983 2.26294 60.7503 2.20162 60.5951 2.19629Z" fill="#FFF9EC"></path>
+            <path d="M67.5119 10.7261L64.6904 17.6725H65.0178C65.2006 17.6581 65.3762 17.5953 65.5268 17.4907C65.6774 17.3862 65.7976 17.2435 65.875 17.0773L68.6547 10.1309H68.3273C68.147 10.1354 67.9723 10.1948 67.8266 10.3011C67.6809 10.4075 67.5711 10.5557 67.5119 10.7261Z" fill="#FFF9EC"></path>
+            <path d="M73.845 9.79748C73.9273 9.80216 74.0096 9.78736 74.0851 9.75426C74.1606 9.72116 74.2272 9.67071 74.2796 9.607C74.3283 9.53326 74.36 9.4496 74.3723 9.36208C74.3847 9.27457 74.3774 9.1854 74.351 9.10105L71.6307 2.19629H70.8331L70.7736 2.33319L68.0177 9.11891C67.9817 9.18568 67.9629 9.26033 67.9629 9.33617C67.9629 9.41201 67.9817 9.48666 68.0177 9.55343C68.07 9.62348 68.1372 9.68112 68.2143 9.72227C68.2915 9.76342 68.3767 9.78707 68.4641 9.79153H68.6248L71.2141 3.37486L73.7081 9.78557L73.845 9.79748Z" fill="#FFF9EC"></path>
+            <path d="M73.9826 10.1548H73.6611L76.3933 17.0715C76.4613 17.2419 76.5774 17.389 76.7274 17.4947C76.8775 17.6004 77.0551 17.6601 77.2385 17.6667H77.5599L74.8516 10.8036C74.7955 10.6166 74.6807 10.4525 74.5242 10.3357C74.3677 10.2189 74.1778 10.1555 73.9826 10.1548Z" fill="#FFF9EC"></path>
+            <path d="M22.1615 13.6349V7.7619L16.4425 10.6984L22.1615 13.6349Z" fill="#F27121"></path>
+            <path d="M15.1716 18L22.1615 13.6349L19.302 12.1667L16.4425 10.6984L4.8457 18H15.1716Z" fill="black"></path>
+            <path d="M14.6156 3H4.84573L10.6441 6.84921L16.4425 10.6984L22.1615 7.7619L14.6156 3Z" fill="#FBB21E"></path>
+        </symbol>
+    </svg>
+
     <!-- Noscript fallback for users with JavaScript disabled -->
     <noscript>
         <div class="noscript-message">
@@ -82,10 +110,7 @@
     <div id="authLoadingOverlay" class="auth-loading-overlay visible">
         <div class="auth-loading-container">
             <div class="auth-loading-logo">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                </svg>
+                <svg class="company-logo" viewBox="0 0 95 16.4" role="img" aria-label="Digiata"><use href="#digiata-logo" width="95" height="16.4"></use></svg>
             </div>
             <div class="auth-loading-spinner"></div>
             <p class="auth-loading-text">Loading...</p>
@@ -96,10 +121,7 @@
     <div id="loginOverlay" class="login-overlay">
         <div class="login-container">
             <div class="login-logo">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                </svg>
+                <svg class="company-logo" viewBox="0 0 95 16.4" role="img" aria-label="Digiata"><use href="#digiata-logo" width="95" height="16.4"></use></svg>
             </div>
             <h1 class="login-title">Office Booking System</h1>
             <p class="login-subtitle">Sign in with your work account to continue</p>
@@ -126,11 +148,7 @@
                 </svg>
             </button>
             <div class="mobile-logo logo-clickable">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                </svg>
-                <span>Office Booking</span>
+                <svg class="company-logo" viewBox="0 0 95 16.4" role="img" aria-label="Digiata"><use href="#digiata-logo" width="95" height="16.4"></use></svg>
             </div>
             <button id="mobileThemeToggle" class="theme-toggle" title="Toggle theme">
                 <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -156,13 +174,10 @@
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
             <div class="logo logo-clickable">
-                <div class="logo-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                    </svg>
+                <div class="logo-brand">
+                    <svg class="company-logo" viewBox="0 0 95 16.4" role="img" aria-label="Digiata"><use href="#digiata-logo" width="95" height="16.4"></use></svg>
+                    <span class="logo-product">Office Booking</span>
                 </div>
-                <span>Office Booking</span>
                 <button id="themeToggle" class="theme-toggle" title="Toggle theme">
                     <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="5"></circle>
@@ -407,15 +422,15 @@
 
             <!-- Desks View -->
             <div id="desksView" class="view">
-                <header class="view-header">
-                    <h1>Floor Plan</h1>
-                    <div class="desk-header-controls">
-                        <select id="floorSelect" class="floor-select">
+                <header class="desks-header">
+                    <div class="desks-title">
+                        <h1>Desks</h1>
+                        <p id="desksSubtitle" class="desks-subtitle"></p>
+                    </div>
+                    <div class="desks-controls">
+                        <select id="floorSelect" class="floor-select" aria-label="Floor">
                             <option value="1">1st Floor</option>
-                            <option value="2">2nd Floor</option>
-                            <option value="3">3rd Floor</option>
                         </select>
-                        <input type="date" id="deskDateSelect" class="date-select">
                         <button id="toggleEditMode" class="btn btn-secondary">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -425,7 +440,20 @@
                         </button>
                     </div>
                 </header>
-                
+
+                <!-- Day strip -->
+                <div id="dayStripBar" class="day-strip-bar">
+                    <button id="dayStripPrev" class="day-nav" aria-label="Previous week">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <div id="dayStrip" class="day-strip" role="tablist" aria-label="Choose a day"></div>
+                    <button id="dayStripNext" class="day-nav" aria-label="Next week">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
+                    <button id="dayStripToday" class="btn btn-secondary day-today">Today</button>
+                    <input type="date" id="deskDateSelect" class="date-select" aria-label="Jump to date">
+                </div>
+
                 <!-- Edit Mode Toolbar -->
                 <div id="editModePanel" class="edit-mode-panel" style="display: none;">
                     <div class="edit-toolbar">
@@ -473,32 +501,46 @@
                         </div>
                     </div>
                 </div>
-                
-                <!-- Floor Map Container -->
-                <div class="floor-map-wrapper">
-                    <div id="floorMapContainer" class="floor-map-container">
-                        <div id="floorMap" class="floor-map">
-                            <!-- Floor elements and desks rendered here -->
+
+                <div class="desks-layout">
+                    <!-- Floor Map -->
+                    <div class="floor-map-wrapper">
+                        <div class="map-zoom" role="group" aria-label="Zoom map">
+                            <button id="mapZoomIn" type="button" aria-label="Zoom in">+</button>
+                            <button id="mapZoomOut" type="button" aria-label="Zoom out">&minus;</button>
+                            <button id="mapZoomReset" type="button" aria-label="Reset zoom" title="Fit to screen">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                            </button>
+                        </div>
+                        <div id="floorMapContainer" class="floor-map-container">
+                            <div id="floorMap" class="floor-map">
+                                <!-- Floor elements and desks rendered here -->
+                            </div>
+                        </div>
+                        <div class="floor-map-legend">
+                            <span class="legend-item"><span class="legend-dot hotseat"></span> Free</span>
+                            <span class="legend-item"><span class="legend-dot team-seat"></span> Team seat</span>
+                            <span class="legend-item"><span class="legend-dot occupied"></span> Taken</span>
+                            <span class="legend-item"><span class="legend-dot my-booking"></span> Yours</span>
+                            <span class="legend-item"><span class="legend-dot unavailable"></span> Unavailable</span>
                         </div>
                     </div>
-                    
-                    <!-- Legend -->
-                    <div class="floor-map-legend">
-                        <span class="legend-item"><span class="legend-dot hotseat"></span> Hotseat</span>
-                        <span class="legend-item"><span class="legend-dot unavailable"></span> Unavailable</span>
-                        <span class="legend-item"><span class="legend-dot team-seat"></span> Team Seat</span>
-                        <span class="legend-item"><span class="legend-dot occupied"></span> Booked</span>
-                        <span class="legend-item"><span class="legend-dot my-booking"></span> Your Booking</span>
-                    </div>
+
+                    <!-- Side panel -->
+                    <aside id="desksSide" class="desks-side">
+                        <section class="side-card" id="myDayCard"></section>
+                        <section class="side-card side-card-grow">
+                            <div class="side-card-head">
+                                <h3>Who's in</h3>
+                                <span id="whosInCount" class="count-pill">0</span>
+                            </div>
+                            <div id="whosInList" class="whos-in-list"></div>
+                        </section>
+                    </aside>
                 </div>
-                
-                <!-- Selected Desk Info -->
-                <div id="selectedDeskPanel" class="selected-desk-panel" style="display: none;">
-                    <div class="selected-desk-header">
-                        <span id="selectedDeskName">DESK-01</span>
-                        <button class="btn btn-primary" id="applyDeskBtn">Apply</button>
-                    </div>
-                </div>
+
+                <!-- Floating desk card -->
+                <div id="deskCard" class="desk-card" hidden></div>
             </div>
 
             <!-- Holidays View -->
@@ -541,7 +583,7 @@
                         <h3>Available Job Titles</h3>
                         <p class="section-hint">These are all job titles found in your Azure AD organization.</p>
                         <div id="jobTitlesList" class="job-titles-list">
-                            <div class="loading-spinner">Loading job titles from Azure AD...</div>
+                            <div class="loading-row"><div class="loading-spinner"></div><span>Loading job titles from Azure AD...</span></div>
                         </div>
                     </div>
                     
@@ -799,14 +841,15 @@
                 <div class="form-row">
                     <div class="form-group form-group-half">
                         <label for="deskWidth">Width (px)</label>
-                        <input type="number" id="deskWidth" value="60" min="30" max="200">
+                        <input type="number" id="deskWidth" value="60" min="6" max="400">
                     </div>
                     <div class="form-group form-group-half">
                         <label for="deskHeight">Height (px)</label>
-                        <input type="number" id="deskHeight" value="40" min="20" max="150">
+                        <input type="number" id="deskHeight" value="40" min="4" max="300">
                     </div>
                 </div>
                 <div class="form-actions">
+                    <button type="button" class="btn btn-danger" id="deskDeleteBtn" style="display: none; margin-right: auto;">Delete desk</button>
                     <button type="button" class="btn btn-secondary" onclick="closeDeskModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="deskFormSubmitBtn">Add Desk</button>
                 </div>

@@ -8,6 +8,10 @@ jest.mock('../../config/supabase', () => require('../mocks/supabase.mock'));
 
 const { mockData, resetMockData, setSimulateError, clearSimulateError } = require('../mocks/supabase.mock');
 const deskBookingsRouter = require('../../routes/deskBookings');
+const { todayInOffice } = require('../../utils/dates');
+
+// Far-future date so 'no booking in the past' never trips these tests
+const FUTURE = '2099-02-01';
 
 const app = express();
 app.use(express.json());
@@ -82,7 +86,7 @@ describe('POST /api/desk-bookings', () => {
     test('creates a new desk booking', async () => {
         const newBooking = {
             deskId: 'd1',
-            date: '2024-02-01',
+            date: FUTURE,
             employeeName: 'John Doe',
             employeeEmail: 'john@example.com',
             teamId: 'team1'
@@ -103,7 +107,7 @@ describe('POST /api/desk-bookings', () => {
     test('returns 400 when deskId is missing', async () => {
         const response = await request(app)
             .post('/api/desk-bookings')
-            .send({ date: '2024-02-01', employeeName: 'John' })
+            .send({ date: FUTURE, employeeName: 'John' })
             .expect(400);
 
         expect(response.body.error).toBe('Missing required fields');
@@ -121,7 +125,7 @@ describe('POST /api/desk-bookings', () => {
     test('returns 400 when employeeName is missing', async () => {
         const response = await request(app)
             .post('/api/desk-bookings')
-            .send({ deskId: 'd1', date: '2024-02-01' })
+            .send({ deskId: 'd1', date: FUTURE })
             .expect(400);
 
         expect(response.body.error).toBe('Missing required fields');
@@ -130,7 +134,7 @@ describe('POST /api/desk-bookings', () => {
     test('returns 400 for non-existent desk', async () => {
         const response = await request(app)
             .post('/api/desk-bookings')
-            .send({ deskId: 'nonexistent', date: '2024-02-01', employeeName: 'John' })
+            .send({ deskId: 'nonexistent', date: FUTURE, employeeName: 'John' })
             .expect(400);
 
         expect(response.body.error).toBe('Desk not found');
@@ -138,12 +142,12 @@ describe('POST /api/desk-bookings', () => {
 
     test('returns 400 if desk already booked for date', async () => {
         mockData.desk_bookings = [
-            { id: 'db1', desk_id: 'd1', date: '2024-02-01' }
+            { id: 'db1', desk_id: 'd1', date: FUTURE }
         ];
 
         const response = await request(app)
             .post('/api/desk-bookings')
-            .send({ deskId: 'd1', date: '2024-02-01', employeeName: 'Jane' })
+            .send({ deskId: 'd1', date: FUTURE, employeeName: 'Jane' })
             .expect(400);
 
         expect(response.body.error).toBe('Desk already booked for this day');
@@ -178,7 +182,7 @@ describe('DELETE /api/desk-bookings/:id', () => {
 describe('POST /api/desk-bookings/:id/checkin', () => {
     beforeEach(() => {
         resetMockData();
-        const today = new Date().toISOString().split('T')[0];
+        const today = todayInOffice();
         mockData.desk_bookings = [
             { id: 'db1', desk_id: 'd1', date: today, checked_in: false }
         ];
@@ -190,7 +194,7 @@ describe('POST /api/desk-bookings/:id/checkin', () => {
     test('checks in with valid booking for today', async () => {
         const response = await request(app)
             .post('/api/desk-bookings/db1/checkin')
-            .send({})
+            .send({ qrCode: 'QR123' })
             .expect(200);
 
         expect(response.body.success).toBe(true);
@@ -213,10 +217,19 @@ describe('POST /api/desk-bookings/:id/checkin', () => {
 
         const response = await request(app)
             .post('/api/desk-bookings/db2/checkin')
-            .send({})
+            .send({ qrCode: 'QR123' })
             .expect(400);
 
         expect(response.body.error).toBe('Can only check in on the booking date');
+    });
+
+    test('returns 400 when QR code is missing', async () => {
+        const response = await request(app)
+            .post('/api/desk-bookings/db1/checkin')
+            .send({})
+            .expect(400);
+
+        expect(response.body.error).toBe('Invalid QR code for this desk');
     });
 
     test('returns 400 for invalid QR code', async () => {
@@ -232,7 +245,7 @@ describe('POST /api/desk-bookings/:id/checkin', () => {
 describe('GET /api/desk-bookings/checkin/:qrCode', () => {
     beforeEach(() => {
         resetMockData();
-        const today = new Date().toISOString().split('T')[0];
+        const today = todayInOffice();
         mockData.desks = [
             { id: 'd1', name: 'Desk 1', location_id: 'loc1', qr_code: 'QR123' }
         ];
@@ -290,3 +303,94 @@ describe('Error handling', () => {
 });
 
 
+
+describe('Booking rules', () => {
+    const mkApp = (user) => {
+        const a = express();
+        a.use(express.json());
+        a.use((req, res, next) => { if (user) req.user = user; next(); });
+        a.use('/api/desk-bookings', deskBookingsRouter);
+        return a;
+    };
+    const signedIn = { authenticated: true, email: 'Jane@Example.com', name: 'Jane Doe' };
+
+    beforeEach(() => {
+        resetMockData();
+        mockData.desks = [
+            { id: 'd1', name: 'Desk 1', location_id: 'loc1', qr_code: 'QR1' },
+            { id: 'd2', name: 'Desk 2', location_id: 'loc1', qr_code: 'QR2' }
+        ];
+        mockData.desk_bookings = [];
+    });
+
+    test('rejects bookings in the past', async () => {
+        const res = await request(mkApp()).post('/api/desk-bookings')
+            .send({ deskId: 'd1', date: '2000-01-01', employeeName: 'John' })
+            .expect(400);
+        expect(res.body.error).toBe('Cannot book a desk in the past');
+    });
+
+    test('rejects malformed dates', async () => {
+        await request(mkApp()).post('/api/desk-bookings')
+            .send({ deskId: 'd1', date: 'tomorrow', employeeName: 'John' })
+            .expect(400);
+    });
+
+    test('allows booking today (office timezone)', async () => {
+        await request(mkApp()).post('/api/desk-bookings')
+            .send({ deskId: 'd1', date: todayInOffice(), employeeName: 'John' })
+            .expect(201);
+    });
+
+    test('signed-in identity overrides the name and email in the body', async () => {
+        const res = await request(mkApp(signedIn)).post('/api/desk-bookings')
+            .send({ deskId: 'd1', date: FUTURE, employeeName: 'Someone Else', employeeEmail: 'x@y.com' })
+            .expect(201);
+        expect(res.body.employeeName).toBe('Jane Doe');
+        expect(res.body.employeeEmail).toBe('jane@example.com');
+    });
+
+    test('one desk per person per day (case-insensitive email)', async () => {
+        mockData.desk_bookings = [
+            { id: 'b1', desk_id: 'd1', desk_name: 'Desk 1', date: FUTURE, employee_email: 'jane@example.com' }
+        ];
+        const res = await request(mkApp(signedIn)).post('/api/desk-bookings')
+            .send({ deskId: 'd2', date: FUTURE })
+            .expect(409);
+        expect(res.body.error).toMatch(/already have Desk 1/);
+    });
+
+    test('same person can book on a different day', async () => {
+        mockData.desk_bookings = [
+            { id: 'b1', desk_id: 'd1', desk_name: 'Desk 1', date: FUTURE, employee_email: 'jane@example.com' }
+        ];
+        await request(mkApp(signedIn)).post('/api/desk-bookings')
+            .send({ deskId: 'd2', date: '2099-02-02' })
+            .expect(201);
+    });
+
+    test('signed-in user cannot cancel someone else\'s booking', async () => {
+        mockData.desk_bookings = [
+            { id: 'b1', desk_id: 'd1', date: FUTURE, employee_email: 'bob@example.com' }
+        ];
+        await request(mkApp(signedIn)).delete('/api/desk-bookings/b1').expect(403);
+        expect(mockData.desk_bookings).toHaveLength(1);
+    });
+
+    test('signed-in user can cancel their own booking', async () => {
+        mockData.desk_bookings = [
+            { id: 'b1', desk_id: 'd1', date: FUTURE, employee_email: 'JANE@example.com' }
+        ];
+        await request(mkApp(signedIn)).delete('/api/desk-bookings/b1').expect(200);
+        expect(mockData.desk_bookings).toHaveLength(0);
+    });
+
+    test('cannot check in to someone else\'s booking', async () => {
+        mockData.desk_bookings = [
+            { id: 'b1', desk_id: 'd1', date: todayInOffice(), employee_email: 'bob@example.com', checked_in: false }
+        ];
+        await request(mkApp(signedIn)).post('/api/desk-bookings/b1/checkin')
+            .send({ qrCode: 'QR1' })
+            .expect(403);
+    });
+});
