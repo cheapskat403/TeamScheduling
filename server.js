@@ -37,6 +37,8 @@ const settingsRoutes = require('./routes/settings');
 
 // Import middleware
 const { authenticate, optionalAuth } = require('./middleware/auth');
+const { requireLoginForApi } = require('./middleware/requireAuth');
+const { socketAuth } = require('./middleware/socketAuth');
 
 // Initialize Express app
 const app = express();
@@ -49,6 +51,9 @@ app.set('trust proxy', 1);
 // Create HTTP server and Socket.IO
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, { cors: { origin: true, credentials: true } });
+
+// Websockets need a valid login too when REQUIRE_AUTH=true
+io.use(socketAuth());
 
 // Initialize Socket.IO handlers
 initializeSocketHandlers(io);
@@ -125,15 +130,21 @@ app.use(express.static('public', {
 app.use('/auth', authRoutes);
 app.use('/api/auth', authRoutes);
 
-// Apply optional authentication to all API routes
-// This attaches user info if a valid token is present, but doesn't require it
+// Attach the user if a valid token is present...
 app.use('/api', optionalAuth);
 
-// Data route (initial load - read only, no auth required)
+// ...and, when REQUIRE_AUTH=true, refuse everything below without one. The only exceptions are the
+// QR check-in lookups (see PUBLIC_READ_PATHS), since people scanning a desk sticker are not signed in.
+app.use('/api', requireLoginForApi);
+
+if (process.env.REQUIRE_AUTH === 'true' && !(process.env.AZURE_AD_TENANT_ID && process.env.AZURE_AD_CLIENT_ID)) {
+    logger.error('REQUIRE_AUTH=true but Azure AD is not configured: every API request will be refused');
+}
+
+// Data route (initial load)
 app.use('/api/data', dataRoutes);
 
-// Protected resource routes
-// GET requests work without auth, but POST/PUT/DELETE require authentication
+// Resource routes (each router also protects its own writes)
 app.use('/api/bookings', bookingsRoutes);
 app.use('/api/locations', locationsRoutes);
 app.use('/api/holidays', holidaysRoutes);
@@ -143,48 +154,9 @@ app.use('/api/floor-elements', floorElementsRoutes);
 app.use('/api/desk-bookings', deskBookingsRoutes);
 app.use('/api/settings', settingsRoutes);
 
-// QR Code check-in route (legacy path)
-app.get('/api/checkin/:qrCode', async (req, res) => {
-    // Forward to desk-bookings route
-    const { supabase } = require('./config/supabase');
-    const { toCamelCase } = require('./utils/helpers');
-    
-    try {
-        const { qrCode } = req.params;
-        
-        const { data: desk, error: deskError } = await supabase
-            .from('desks')
-            .select('*')
-            .eq('qr_code', qrCode)
-            .single();
-        
-        if (deskError || !desk) {
-            return res.status(404).json({ error: 'Desk not found' });
-        }
-        
-        const { data: location } = await supabase
-            .from('locations')
-            .select('*')
-            .eq('id', desk.location_id)
-            .single();
-        
-        const today = require('./utils/dates').todayInOffice();
-        const { data: todayBookings } = await supabase
-            .from('desk_bookings')
-            .select('*')
-            .eq('desk_id', desk.id)
-            .eq('date', today);
-        
-        res.json({
-            desk: toCamelCase(desk),
-            location: toCamelCase(location),
-            todayBookings: toCamelCase(todayBookings || [])
-        });
-    } catch (error) {
-        logger.error('Error getting check-in data:', error);
-        res.status(500).json({ error: 'Failed to get check-in data' });
-    }
-});
+// QR code check-in lookup (legacy path). Same handler as /api/desk-bookings/checkin/:qrCode, and the
+// only API read that works without logging in (see PUBLIC_READ_PATHS in middleware/requireAuth.js).
+app.get('/api/checkin/:qrCode', deskBookingsRoutes.checkinInfo);
 
 // ============================================
 // Start Server

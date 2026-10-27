@@ -273,6 +273,45 @@ describe('GET /api/desk-bookings/checkin/:qrCode', () => {
 
         expect(response.body.error).toBe('Desk not found');
     });
+
+    // This lookup is readable without logging in, so it must not hand out more than the page shows
+    test('only returns what the check-in page shows: no emails, QR codes or internal fields', async () => {
+        mockData.locations = [{ id: 'loc1', name: 'Head Office', address: '1 Secret Road', capacity: 21 }];
+        mockData.desks = [{
+            id: 'd1', name: 'Desk 1', floor: '1', zone: 'Open Plan', location_id: 'loc1',
+            qr_code: 'QR123', x: 5, y: 6, assigned_team_id: 'team9'
+        }];
+        mockData.desk_bookings = [{
+            id: 'db1', desk_id: 'd1', date: todayInOffice(), employee_name: 'John',
+            employee_email: 'john@example.com', team_id: 'team1', checked_in: true
+        }];
+
+        const response = await request(app).get('/api/desk-bookings/checkin/QR123').expect(200);
+
+        expect(response.body).toEqual({
+            desk: { id: 'd1', name: 'Desk 1', floor: '1', zone: 'Open Plan' },
+            location: { name: 'Head Office' },
+            todayBookings: [{ id: 'db1', employeeName: 'John', checkedIn: true }]
+        });
+        const text = JSON.stringify(response.body);
+        expect(text).not.toContain('john@example.com');
+        expect(text).not.toContain('QR123');
+        expect(text).not.toContain('Secret Road');
+    });
+
+    test('a booking that is not checked in yet is reported as such', async () => {
+        const response = await request(app).get('/api/desk-bookings/checkin/QR123').expect(200);
+        expect(response.body.todayBookings).toEqual([{ id: 'db1', employeeName: 'John', checkedIn: false }]);
+    });
+
+    test('the legacy /api/checkin/:qrCode path serves exactly the same data', async () => {
+        const legacy = express();
+        legacy.get('/api/checkin/:qrCode', deskBookingsRouter.checkinInfo);
+
+        const viaNew = await request(app).get('/api/desk-bookings/checkin/QR123').expect(200);
+        const viaLegacy = await request(legacy).get('/api/checkin/QR123').expect(200);
+        expect(viaLegacy.body).toEqual(viaNew.body);
+    });
 });
 
 describe('Error handling', () => {

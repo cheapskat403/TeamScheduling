@@ -233,9 +233,12 @@ router.post('/:id/checkin', async (req, res) => {
 });
 
 /**
- * Get check-in page data (for QR code scan)
+ * Get check-in page data (for QR code scan).
+ * This is readable without logging in (the page is opened from a sticker on the desk), so it only
+ * returns what the page shows: no email addresses, no QR codes, no other internal fields.
+ * Also served at /api/checkin/:qrCode, see server.js.
  */
-router.get('/checkin/:qrCode', async (req, res) => {
+async function checkinInfo(req, res) {
     try {
         const { qrCode } = req.params;
         
@@ -266,15 +269,22 @@ router.get('/checkin/:qrCode', async (req, res) => {
             .eq('date', today);
         
         res.json({
-            desk: toCamelCase(desk),
-            location: toCamelCase(location),
-            todayBookings: toCamelCase(todayBookings || [])
+            desk: { id: desk.id, name: desk.name, floor: desk.floor, zone: desk.zone },
+            location: location ? { name: location.name } : null,
+            todayBookings: (todayBookings || []).map(b => ({
+                id: b.id,
+                employeeName: b.employee_name,
+                checkedIn: !!b.checked_in
+            }))
         });
     } catch (error) {
         logger.error('Error getting check-in data:', error);
         res.status(500).json({ error: 'Failed to get check-in data' });
     }
-});
+}
+
+router.get('/checkin/:qrCode', checkinInfo);
+router.checkinInfo = checkinInfo;
 
 module.exports = router;
 
