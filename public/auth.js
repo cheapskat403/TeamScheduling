@@ -175,6 +175,24 @@ async function getAccessToken() {
 }
 
 // Get ID token for backend API calls (has app client ID as audience)
+/**
+ * Like getIdToken, but silent: it never opens a popup or redirects. Used for background API calls and
+ * the websocket, where an unexpected popup would be worse than simply sending no token.
+ * Resolves with the ID token, or null when there is no signed-in account or the session has expired.
+ */
+async function getIdTokenQuietly() {
+    if (!msalInstance || !currentAccount) return null;
+    try {
+        const response = await msalInstance.acquireTokenSilent({
+            scopes: ['openid', 'profile', 'email'],
+            account: currentAccount
+        });
+        return response.idToken || null;
+    } catch (error) {
+        return null;
+    }
+}
+
 async function getIdToken() {
     if (!msalInstance) {
         console.error('getIdToken: MSAL instance not initialized');
@@ -540,4 +558,51 @@ window.isAuthenticated = isAuthenticated;
 window.getCurrentUser = getCurrentUser;
 window.getAccessToken = getAccessToken;
 window.getIdToken = getIdToken;
+window.getIdTokenQuietly = getIdTokenQuietly;
 
+// ============================================
+// Send the signed-in user's token with every API call
+// ============================================
+// The server refuses API requests without a valid login (when REQUIRE_AUTH=true), reads included, so
+// every call to our own /api has to carry the token. Wrapping fetch once covers all existing calls.
+// A token problem never breaks a request: it goes out without the header and the server decides.
+(function installApiAuthFetch() {
+    const nativeFetch = window.fetch.bind(window);
+    // Public on the server too: sign-in config and the QR check-in lookups (people scanning a desk sticker)
+    const PUBLIC_API = [/^\/api\/auth\//, /^\/api\/checkin\//, /^\/api\/desk-bookings\/checkin\//];
+    let signInPrompted = false;
+
+    window.fetch = async function (input, init) {
+        let url;
+        try {
+            url = new URL(typeof input === 'string' ? input : input.url, window.location.origin);
+        } catch (error) {
+            return nativeFetch(input, init);
+        }
+
+        const isOurApi = url.origin === window.location.origin
+            && url.pathname.startsWith('/api/')
+            && !PUBLIC_API.some(re => re.test(url.pathname));
+        if (!isOurApi) return nativeFetch(input, init);
+
+        const headers = new Headers((init && init.headers) || (input instanceof Request ? input.headers : undefined));
+        if (!headers.has('Authorization')) {
+            const token = await getIdTokenQuietly();
+            if (token) headers.set('Authorization', 'Bearer ' + token);
+        }
+
+        const response = await nativeFetch(input, Object.assign({}, init, { headers }));
+
+        // The session is gone (for example the refresh token expired): send the user back to sign in
+        if (response.status === 401 && !signInPrompted) {
+            try {
+                const body = await response.clone().json();
+                if (body && body.code === 'AUTH_REQUIRED') {
+                    signInPrompted = true;
+                    showLoginUI();
+                }
+            } catch (error) { /* not our JSON error: leave it alone */ }
+        }
+        return response;
+    };
+})();

@@ -61,6 +61,31 @@ function requireAuth(req, res, next) {
 }
 
 /**
+ * Paths under /api that stay readable without logging in, because the people using them cannot sign
+ * in: the QR check-in page is opened from a sticker on a desk and shows the desk and who booked it
+ * today. They are matched against the path relative to /api, and only for GET.
+ */
+const PUBLIC_READ_PATHS = [
+    /^\/checkin\/[^/]+$/,
+    /^\/desk-bookings\/checkin\/[^/]+$/
+];
+
+/**
+ * When REQUIRE_AUTH=true, nothing under /api can be read or changed without a valid login, apart
+ * from the public paths above. Mount it after optionalAuth, which attaches req.user.
+ * REQUIRE_AUTH is read on every request, so tests can switch it.
+ */
+function requireLoginForApi(req, res, next) {
+    if (process.env.REQUIRE_AUTH !== 'true') return next();
+    if (req.method === 'OPTIONS') return next();   // CORS preflight requests never carry credentials
+    if (req.user && req.user.authenticated) return next();
+    if (req.method === 'GET' && PUBLIC_READ_PATHS.some(re => re.test(req.path))) return next();
+
+    logger.warn(`Refused unauthenticated ${req.method} ${req.originalUrl}`, { reason: req.user && req.user.reason });
+    return res.status(401).json({ error: 'Authentication required', code: 'AUTH_REQUIRED' });
+}
+
+/**
  * Middleware that requires the user to be the owner of a resource
  * Uses a callback to determine ownership
  */
@@ -91,6 +116,8 @@ function requireOwnership(getOwnerId) {
 
 module.exports = {
     requireAuthForWrites,
+    requireLoginForApi,
+    PUBLIC_READ_PATHS,
     requireAuth,
     requireOwnership,
     REQUIRE_AUTH_FOR_WRITES

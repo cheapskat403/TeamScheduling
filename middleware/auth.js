@@ -138,6 +138,19 @@ function authenticate(req, res, next) {
 }
 
 /**
+ * Verify a token outside an Express request (used for websockets).
+ * Resolves with the decoded claims; rejects when the token is expired, forged or not meant for this app.
+ */
+function verifyToken(token) {
+    return new Promise((resolve, reject) => {
+        if (!AZURE_AD_TENANT_ID || !AZURE_AD_CLIENT_ID) {
+            return reject(new Error('Azure AD not configured'));
+        }
+        jwt.verify(token, getSigningKey, getVerifyOptions(), (err, decoded) => (err ? reject(err) : resolve(decoded)));
+    });
+}
+
+/**
  * Optional authentication middleware - doesn't require token but attaches user if present
  * 
  * Usage: app.use('/api/optional', optionalAuth, routes)
@@ -219,6 +232,7 @@ module.exports = {
     optionalAuth,
     requireRole,
     hasRole,
-    extractToken
+    extractToken,
+    verifyToken
 };
 

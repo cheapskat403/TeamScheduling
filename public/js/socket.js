@@ -78,11 +78,29 @@ export function initSocket() {
 
     // Initialize Socket.IO
     if (typeof io !== 'undefined') {
-        socket = io();
-        
+        // The server only accepts websockets with a valid login. This function runs on every connect and
+        // reconnect, so the token is always fresh.
+        socket = io({
+            auth: (cb) => {
+                const getToken = window.getIdTokenQuietly || (async () => null);
+                getToken().then(token => cb({ token })).catch(() => cb({}));
+            }
+        });
+
+        let authRetries = 0;
+
         socket.on('connect', () => {
+            authRetries = 0;
             console.log('Socket connected for user:', userName);
             joinCurrentRoom();
+        });
+
+        // A refused login is not retried automatically by Socket.IO: try again a few times with a fresh token
+        socket.on('connect_error', (err) => {
+            if (/^AUTH_/.test(err.message) && authRetries < 5) {
+                authRetries++;
+                setTimeout(() => socket.connect(), 3000 * authRetries);
+            }
         });
 
         socket.on('presence:update', ({ roomKey, viewers }) => {
