@@ -35,7 +35,7 @@ import {
     handleDragLeave, handleDrop 
 } from './dragdrop.js';
 import { addToOutlookCalendar, downloadICS } from './calendar-sync.js';
-import { switchView, setupSettingsSubmenu, toggleMobileMenu, closeMobileMenu } from './views.js';
+import { switchView, setupSettingsSubmenu, toggleMobileMenu, closeMobileMenu, savedView, viewFromHash } from './views.js';
 import { 
     initTeamRolesView, toggleTeamRole, openManagerSelector, 
     closeManagerDropdown, selectManager 
@@ -70,6 +70,12 @@ async function initApp() {
     
     // Initialize Socket.IO
     initSocket();
+
+    // Return to the page we were on before a refresh
+    const startView = savedView();
+    if (startView && startView !== 'calendar') {
+        await switchView(startView, { updateUrl: false });
+    }
     
     console.log('✅ Application initialized');
 }
@@ -85,7 +91,8 @@ function setupEventListeners() {
     
     // Logo click - navigate to calendar
     document.querySelectorAll('.logo-clickable').forEach(logo => {
-        logo.addEventListener('click', () => {
+        logo.addEventListener('click', (e) => {
+            if (e.target.closest('.theme-toggle')) return;
             switchView('calendar');
             closeMobileMenu(); // Close mobile menu if open
         });
@@ -104,6 +111,12 @@ function setupEventListeners() {
     
     // Theme toggle
     document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
+    document.getElementById('mobileThemeToggle')?.addEventListener('click', toggleTheme);
+
+    // Browser back / forward between pages
+    window.addEventListener('popstate', () => {
+        switchView(viewFromHash() || 'calendar', { updateUrl: false });
+    });
     
     // Location change
     elements.locationSelect?.addEventListener('change', handleLocationChange);

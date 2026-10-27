@@ -2694,10 +2694,9 @@ form {
     font-size: 1rem;
 }
 
-.mobile-logo svg {
-    width: 24px;
-    height: 24px;
-    color: var(--accent-primary);
+.mobile-logo .company-logo {
+    height: 20px;
+    width: auto;
 }
 
 .mobile-overlay {
@@ -2891,12 +2890,6 @@ form {
     
     .floor-map {
         transform-origin: top left;
-    }
-    
-    /* Make desks more touch-friendly */
-    .floor-desk {
-        min-width: 50px;
-        min-height: 35px;
     }
     
     /* Floor map legend */
@@ -3455,19 +3448,20 @@ form {
 
 .desk-edit-controls {
     position: absolute;
-    top: -10px;
-    right: -10px;
+    /* --map-inv-scale cancels the map zoom so the button stays the same size on screen */
+    top: calc(-10px * var(--map-inv-scale, 1));
+    right: calc(-10px * var(--map-inv-scale, 1));
     z-index: 10;
 }
 
 .desk-edit-controls button {
-    width: 18px;
-    height: 18px;
+    width: calc(18px * var(--map-inv-scale, 1));
+    height: calc(18px * var(--map-inv-scale, 1));
     border-radius: 50%;
     background: var(--danger);
     color: white;
     border: none;
-    font-size: 12px;
+    font-size: calc(12px * var(--map-inv-scale, 1));
     line-height: 1;
     cursor: pointer;
     display: flex;
@@ -4353,21 +4347,14 @@ form {
 }
 
 .auth-loading-logo {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto var(--spacing-lg);
-    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-    border-radius: 16px;
+    margin: 0 auto var(--spacing-xl);
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 8px 32px rgba(217, 92, 2, 0.3);
 }
 
-.auth-loading-logo svg {
-    width: 32px;
-    height: 32px;
-    stroke: white;
+.auth-loading-logo .company-logo {
+    height: 34px;
 }
 
 .auth-loading-spinner {
@@ -4413,21 +4400,15 @@ form {
 }
 
 .login-logo {
-    width: 80px;
-    height: 80px;
-    margin: 0 auto var(--spacing-xl);
-    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-    border-radius: var(--radius-lg);
+    margin: 0 auto var(--spacing-2xl);
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: var(--shadow-glow);
 }
 
-.login-logo svg {
-    width: 48px;
-    height: 48px;
-    stroke: white;
+.login-logo .company-logo {
+    height: 46px;
+    max-width: 100%;
 }
 
 .login-title {
@@ -5068,3 +5049,913 @@ form {
     margin-right: 2px;
 }
 
+
+
+/* ============================================
+   Desks page redesign: day strip, tiles, side panel, floating card
+   ============================================ */
+#desksView.active {
+    gap: var(--spacing-md);
+}
+
+.desks-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: var(--spacing-md);
+    flex-shrink: 0;
+}
+
+.desks-title h1 {
+    margin: 0;
+}
+
+.desks-subtitle {
+    margin: 2px 0 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.desks-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+/* ----- Day strip ----- */
+.day-strip-bar {
+    display: flex;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+    flex-shrink: 0;
+}
+
+.day-strip {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--spacing-sm);
+    flex: 1;
+    min-width: 0;
+}
+
+.day-nav {
+    width: 36px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.day-nav svg {
+    width: 18px;
+    height: 18px;
+}
+
+.day-nav:hover {
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.day-today {
+    flex-shrink: 0;
+}
+
+.day-strip-bar .date-select {
+    flex-shrink: 0;
+    width: 150px;
+}
+
+.day-chip {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 4px 9px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-family: inherit;
+    cursor: pointer;
+    transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+}
+
+.day-chip:hover {
+    border-color: var(--accent-primary);
+    transform: translateY(-1px);
+}
+
+.day-chip.selected {
+    border-color: var(--accent-primary);
+    background: var(--accent-glow);
+    color: var(--text-primary);
+}
+
+.day-chip.past {
+    opacity: 0.5;
+}
+
+.day-chip.weekend:not(.selected) {
+    opacity: 0.7;
+}
+
+.day-chip.today::after {
+    content: '';
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+}
+
+.day-chip-dow {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+.day-chip-num {
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--text-primary);
+}
+
+.day-chip-meter {
+    width: 70%;
+    height: 4px;
+    margin-top: 4px;
+    border-radius: 2px;
+    background: var(--border-color);
+    overflow: hidden;
+}
+
+.day-chip-meter span {
+    display: block;
+    height: 100%;
+    border-radius: 2px;
+    background: var(--success);
+}
+
+.day-chip-meter.busy span { background: var(--warning); }
+.day-chip-meter.full span { background: var(--danger); }
+
+.day-chip-free {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+/* ----- Layout: map + side panel ----- */
+.desks-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: var(--spacing-md);
+    flex: 1;
+    min-height: 0;
+}
+
+.desks-side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    min-height: 0;
+}
+
+.side-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+}
+
+.side-card-grow {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.side-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-sm);
+}
+
+.side-card-head h3 {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.count-pill {
+    min-width: 24px;
+    padding: 2px 8px;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 999px;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.side-eyebrow {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.my-desk-name {
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 4px;
+}
+
+.my-desk-name.muted {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.my-desk-meta {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-sm);
+}
+
+.side-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+}
+
+.btn-full {
+    width: 100%;
+    justify-content: center;
+}
+
+/* ----- Who is in ----- */
+.whos-in-list {
+    overflow-y: auto;
+    margin: 0 calc(var(--spacing-sm) * -1);
+    padding: 0 var(--spacing-sm);
+}
+
+.whos-in-empty {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.whos-in-group + .whos-in-group {
+    margin-top: var(--spacing-sm);
+}
+
+.whos-in-team {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.team-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.whos-in-team-count {
+    margin-left: auto;
+    font-weight: 500;
+}
+
+.whos-in-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 6px 8px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.875rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.whos-in-row:hover {
+    background: var(--bg-card-hover);
+}
+
+.whos-in-row.me .whos-in-name {
+    font-weight: 600;
+}
+
+.whos-in-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.whos-in-desk {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.avatar {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--team-color, var(--text-muted));
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.avatar.sm {
+    width: 24px;
+    height: 24px;
+    font-size: 0.625rem;
+}
+
+/* ----- Desk tiles ----- */
+.floor-desk {
+    border-radius: 8px;
+    border-width: 1.5px;
+    gap: 1px;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+
+.floor-desk:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
+.floor-desk.hotseat {
+    background: color-mix(in srgb, var(--success) 14%, var(--desk-bg));
+    border-color: color-mix(in srgb, var(--success) 65%, transparent);
+}
+
+.floor-desk.hotseat:hover {
+    background: color-mix(in srgb, var(--success) 26%, var(--desk-bg));
+    border-color: var(--success);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--success) 35%, transparent);
+    transform: translateY(-1px);
+}
+
+.floor-desk.team-seat {
+    background: color-mix(in srgb, var(--team-color, var(--warning)) 12%, var(--desk-bg));
+    border-style: dashed;
+    border-color: var(--team-color, var(--warning));
+}
+
+.floor-desk.booked {
+    background: color-mix(in srgb, var(--team-color, var(--text-muted)) 16%, var(--desk-bg));
+    border-color: color-mix(in srgb, var(--team-color, var(--text-muted)) 70%, transparent);
+    box-shadow: none;
+}
+
+.floor-desk.my-booking {
+    background: color-mix(in srgb, var(--accent-primary) 22%, var(--desk-bg));
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px var(--accent-glow), 0 4px 14px var(--accent-glow);
+}
+
+.floor-desk .desk-label {
+    font-size: var(--desk-label-size, 0.55rem);
+    line-height: 1;
+}
+
+.desk-avatar {
+    width: var(--desk-avatar-size, 20px);
+    height: var(--desk-avatar-size, 20px);
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--team-color, var(--text-muted));
+    color: #fff;
+    font-size: calc(var(--desk-avatar-size, 20px) * 0.42);
+    font-weight: 700;
+    line-height: 1;
+}
+
+.floor-desk.my-booking .desk-avatar {
+    background: var(--accent-primary);
+}
+
+.floor-desk.suggested {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.floor-desk.pulse {
+    animation: deskPulse 0.8s ease-out 3;
+    z-index: 30;
+}
+
+@keyframes deskPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(217, 92, 2, 0.7); }
+    100% { box-shadow: 0 0 0 18px rgba(217, 92, 2, 0); }
+}
+
+/* ----- Floating desk card ----- */
+.desk-card {
+    position: fixed;
+    z-index: 1200;
+    width: 280px;
+    padding: var(--spacing-md);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    animation: deskCardIn 0.14s ease-out;
+}
+
+.desk-card[hidden] {
+    display: none;
+}
+
+@keyframes deskCardIn {
+    from { opacity: 0; transform: translateY(4px) scale(0.98); }
+    to   { opacity: 1; transform: none; }
+}
+
+.desk-card .card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.card-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.card-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.card-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.card-close:hover {
+    color: var(--text-primary);
+}
+
+.card-person {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: var(--spacing-sm);
+}
+
+.card-person-name {
+    font-weight: 600;
+}
+
+.card-person-sub {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.card-status {
+    font-size: 0.85rem;
+    margin-bottom: var(--spacing-sm);
+}
+
+.card-status.muted { color: var(--text-muted); }
+.card-status.ok    { color: var(--success); }
+.card-status.warn  { color: var(--warning); }
+
+.card-suggest {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent-primary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.card-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+/* ----- Toast with action (Undo) ----- */
+.toast.toast-with-action {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.toast-action {
+    background: none;
+    border: none;
+    color: var(--accent-primary);
+    font-family: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* ----- Edit mode: just the map, no booking chrome ----- */
+#desksView.desks-editing .day-strip-bar,
+#desksView.desks-editing .desks-side {
+    display: none;
+}
+
+#desksView.desks-editing .desks-layout {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+/* scaleFloorMap() positions the map from its top-left corner at every size */
+.desks-layout .floor-map-container {
+    justify-content: flex-start;
+    align-items: flex-start;
+    touch-action: none;
+}
+
+/* ----- Tablet / phone ----- */
+@media (max-width: 1024px) {
+    .desks-layout {
+        grid-template-columns: minmax(0, 1fr) 260px;
+    }
+}
+
+@media (max-width: 768px) {
+    #desksView.active {
+        height: auto;
+        max-height: none;
+        overflow: visible;
+        min-width: 0;
+    }
+
+    .desks-layout,
+    .desks-layout > * {
+        min-width: 0;
+    }
+
+    .desks-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .day-strip-bar {
+        flex-wrap: wrap;
+    }
+
+    .day-strip {
+        order: 3;
+        flex-basis: 100%;
+        gap: 4px;
+    }
+
+    .day-chip {
+        padding: 6px 2px 7px;
+    }
+
+    .day-chip-free {
+        display: none;
+    }
+
+    .day-strip-bar .date-select {
+        flex: 1;
+        width: auto;
+    }
+
+    .desks-layout {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .desks-layout .floor-map-wrapper {
+        flex: none;
+        height: 55vh;
+        /* The 1200px map canvas must not widen the page */
+        contain: inline-size;
+    }
+
+    /* scaleFloorMap() positions the map from its top-left corner on phones */
+    .desks-layout .floor-map-container {
+        justify-content: flex-start;
+        align-items: flex-start;
+    }
+
+    .desks-side {
+        overflow: visible;
+    }
+
+    .side-card-grow {
+        flex: none;
+    }
+
+    .whos-in-list {
+        max-height: 40vh;
+    }
+
+    .desk-card {
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: auto;
+        width: auto;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        padding-bottom: calc(var(--spacing-md) + env(safe-area-inset-bottom, 0px));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .floor-desk.pulse,
+    .desk-card {
+        animation: none;
+    }
+}
+
+.side-actions .btn {
+    flex: 1;
+    justify-content: center;
+    white-space: nowrap;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+}
+
+/* ----- Background drawing, zoom controls, small desks ----- */
+.floor-underlay {
+    position: absolute;
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+}
+
+/* The drawing is dark-on-white: flip it in the dark theme so it does not glare */
+:root:not([data-theme="light"]) .floor-underlay {
+    filter: invert(0.92) hue-rotate(180deg);
+    opacity: 0.85;
+}
+
+.floor-map-wrapper {
+    position: relative;
+}
+
+.map-zoom {
+    position: absolute;
+    top: calc(var(--spacing-md) + 10px);
+    right: calc(var(--spacing-md) + 10px);
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.map-zoom button {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.map-zoom button:last-child {
+    border-bottom: none;
+}
+
+.map-zoom button:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+}
+
+.map-zoom svg {
+    width: 16px;
+    height: 16px;
+}
+
+.floor-map-wrapper.panning .floor-map-container {
+    cursor: grabbing;
+}
+
+.floor-desk.compact {
+    border-radius: 3px;
+    border-width: 1px;
+    gap: 0;
+}
+
+.floor-desk.compact.booked .desk-label,
+.floor-desk.compact.my-booking .desk-label {
+    display: none;
+}
+
+.floor-desk.compact .desk-chair {
+    width: 8px;
+    height: 8px;
+    border-width: 1px;
+}
+
+/* Profile photo replaces the initials once it has loaded */
+.avatar.has-photo,
+.desk-avatar.has-photo {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    color: transparent;
+}
+
+.avatar.lg {
+    width: 40px;
+    height: 40px;
+    font-size: 0.95rem;
+}
+
+/* Hover card */
+.desk-hover {
+    position: fixed;
+    z-index: 1190;
+    max-width: 260px;
+    padding: 10px 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    pointer-events: none;
+    animation: deskCardIn 0.12s ease-out;
+}
+
+.desk-hover[hidden] {
+    display: none;
+}
+
+.hover-person {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.hover-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.hover-sub {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.hover-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.hover-ok {
+    color: var(--success);
+}
+
+/* Tall narrow desks: name reads along the long side */
+.floor-desk.upright .desk-label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+}
+
+.confirm-modal {
+    z-index: 1100;
+}
+
+.confirm-modal .confirm-body {
+    padding: var(--spacing-lg);
+}
+
+.confirm-modal .confirm-text {
+    margin: 0 0 var(--spacing-lg);
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.confirm-modal .form-actions {
+    border-top: none;
+    padding-top: 0;
+}
+
+.confirm-modal .form-actions .btn {
+    min-width: 96px;
+    justify-content: center;
+}
+
+.floor-desk.compact .desk-chair.top    { top: -10px; }
+.floor-desk.compact .desk-chair.bottom { bottom: -10px; }
+.floor-desk.compact .desk-chair.left   { left: -10px; }
+.floor-desk.compact .desk-chair.right  { right: -10px; }
+
+
+/* Loading state: a spinning ring with its label beside it. Only the ring rotates, never the words. */
+.loading-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xl);
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.loading-row .loading-spinner {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    border-width: 2px;
+    margin: 0;
+}
+
+/* ----- Company logo ----- */
+:root {
+    --logo-word: #FFF9EC;     /* wordmark on dark backgrounds */
+    --logo-ink: #FFF9EC;      /* the mark's large shape is black in the artwork, which would vanish on dark */
+}
+
+[data-theme="light"] {
+    --logo-word: #1a1a2e;
+    --logo-ink: #000000;
+}
+
+#digiata-logo path[fill="#FFF9EC"] {
+    fill: var(--logo-word, #FFF9EC);
+}
+
+#digiata-logo path[fill="black"] {
+    fill: var(--logo-ink, #000000);
+}
+
+.company-logo {
+    display: block;
+    height: 24px;
+    width: auto;
+    flex-shrink: 0;
+}
+
+/* Sidebar, top left: logo with the product name underneath */
+.logo-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+}
+
+.logo-brand .company-logo {
+    height: 26px;
+}
+
+.logo-product {
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}

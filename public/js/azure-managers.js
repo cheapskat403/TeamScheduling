@@ -85,7 +85,7 @@ export async function renderJobTitlesList() {
         return;
     }
     
-    container.innerHTML = '<div class="loading-spinner">Loading job titles from Azure AD...</div>';
+    container.innerHTML = '<div class="loading-row"><div class="loading-spinner"></div><span>Loading job titles from Azure AD...</span></div>';
     
     try {
         if (typeof fetchAllJobTitles !== 'function') {

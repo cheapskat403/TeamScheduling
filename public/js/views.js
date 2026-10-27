@@ -18,7 +18,7 @@ let currentView = 'calendar';
 /**
  * Switch to a different view
  */
-export async function switchView(viewName) {
+export async function switchView(viewName, { updateUrl = true } = {}) {
     // Cleanup event listeners from previous view
     if (currentView && currentView !== viewName) {
         cleanupView(currentView);
@@ -43,9 +43,16 @@ export async function switchView(viewName) {
         item.classList.toggle('active', item.dataset.view === viewName);
     });
     
+    // Remember where we are, so a refresh (or the back button) returns to this page
+    try { sessionStorage.setItem('currentView', viewName); } catch (e) { /* storage unavailable */ }
+    if (updateUrl && location.hash !== `#${viewName}`) {
+        history.pushState({ view: viewName }, '', `#${viewName}`);
+    }
+    revealNavItem(viewName);
+
     // Close mobile menu
     closeMobileMenu();
-    
+
     // View-specific initialization
     switch (viewName) {
         case 'calendar':
@@ -124,6 +131,33 @@ async function loadFloorPlanModule() {
 /**
  * Setup settings submenu toggle
  */
+/** The view named in the URL hash, if there is one and it exists */
+export function viewFromHash() {
+    let name = '';
+    try { name = decodeURIComponent(location.hash.replace(/^#\/?/, '')); } catch (e) { return null; }
+    return name && document.getElementById(`${name}View`)?.classList.contains('view') ? name : null;
+}
+
+/** The page to open on load: the URL's, else the one this tab was last on */
+export function savedView() {
+    const fromHash = viewFromHash();
+    if (fromHash) return fromHash;
+    try {
+        const name = sessionStorage.getItem('currentView');
+        return name && document.getElementById(`${name}View`)?.classList.contains('view') ? name : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+/** Pages inside the Settings submenu need it open to show which one is active */
+function revealNavItem(viewName) {
+    const item = document.querySelector(`.nav-item[data-view="${viewName}"]`);
+    if (!item || !item.closest('#settingsSubmenu')) return;
+    document.getElementById('settingsSubmenu')?.classList.add('open');
+    document.getElementById('settingsToggle')?.classList.add('expanded');
+}
+
 export function setupSettingsSubmenu() {
     const settingsToggle = document.getElementById('settingsToggle');
     const settingsSubmenu = document.getElementById('settingsSubmenu');
