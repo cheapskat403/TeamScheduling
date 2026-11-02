@@ -4,6 +4,7 @@ const { supabase } = require('../config/supabase');
 const { toCamelCase } = require('../utils/helpers');
 const logger = require('../utils/logger');
 const { requireAuthForWrites } = require('../middleware/requireAuth');
+const { validateBody } = require('../utils/validate');
 
 // Protect write operations
 router.use(requireAuthForWrites);
@@ -11,7 +12,7 @@ router.use(requireAuthForWrites);
 /**
  * Create a new team
  */
-router.post('/', async (req, res) => {
+router.post('/', validateBody('team'), async (req, res) => {
     try {
         const { name, color, memberCount, manager, managerImage, locationId } = req.body;
         
@@ -46,7 +47,7 @@ router.post('/', async (req, res) => {
 /**
  * Update a team
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', validateBody('team'), async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;

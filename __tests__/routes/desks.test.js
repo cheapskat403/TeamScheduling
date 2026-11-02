@@ -148,7 +148,7 @@ describe('PUT /api/desks/:id', () => {
             name: 'Updated Desk',
             floor: '2',
             zone: 'South',
-            deskType: 'assigned',
+            deskType: 'team_seat',
             assignedTeamId: 'team1'
         };
 

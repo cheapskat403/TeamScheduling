@@ -5,6 +5,7 @@ const { supabase } = require('../config/supabase');
 const { toCamelCase } = require('../utils/helpers');
 const logger = require('../utils/logger');
 const { requireAuthForWrites } = require('../middleware/requireAuth');
+const { holidayYear, countryCode, checks, ValidationError } = require('../utils/validate');
 
 // Protect write operations
 router.use(requireAuthForWrites);
@@ -14,14 +15,29 @@ router.use(requireAuthForWrites);
  */
 router.get('/fetch/:year', async (req, res) => {
     try {
-        const { year } = req.params;
-        const country = req.query.country || 'ZA';
-        
+        // These go into the URL we call, so they must be exactly a year and a country code
+        let year, country;
+        try {
+            year = holidayYear(req.params.year);
+            country = countryCode(req.query.country || 'ZA');
+        } catch (validationError) {
+            if (validationError instanceof ValidationError) {
+                return res.status(400).json({ error: validationError.message, code: 'INVALID_INPUT' });
+            }
+            throw validationError;
+        }
+
+        const MAX_RESPONSE_BYTES = 500000;
         const fetchHolidays = () => {
             return new Promise((resolve, reject) => {
-                https.get(`https://date.nager.at/api/v3/PublicHolidays/${year}/${country}`, (response) => {
+                const request = https.get(`https://date.nager.at/api/v3/PublicHolidays/${year}/${country}`, (response) => {
                     let data = '';
-                    response.on('data', chunk => data += chunk);
+                    response.on('data', chunk => {
+                        data += chunk;
+                        if (data.length > MAX_RESPONSE_BYTES) {
+                            request.destroy(new Error('Holiday response too large'));
+                        }
+                    });
                     response.on('end', () => {
                         try {
                             resolve(JSON.parse(data));
@@ -29,7 +45,9 @@ router.get('/fetch/:year', async (req, res) => {
                             reject(new Error('Failed to parse holiday data'));
                         }
                     });
-                }).on('error', reject);
+                });
+                request.setTimeout(10000, () => request.destroy(new Error('Holiday request timed out')));
+                request.on('error', reject);
             });
         };
         
@@ -53,11 +71,28 @@ router.get('/fetch/:year', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const { holidays } = req.body;
-        
+
+        // A list of {date, name}: real dates, short plain names, at most a few hundred
+        if (!Array.isArray(holidays) || holidays.length > 400) {
+            return res.status(400).json({ error: 'holidays must be a list of at most 400 items', code: 'INVALID_INPUT' });
+        }
+        let cleaned;
+        try {
+            cleaned = holidays.map(h => ({
+                date: checks.date(h && h.date, 'date'),
+                name: checks.str(100)(h && h.name, 'name')
+            }));
+        } catch (validationError) {
+            if (validationError instanceof ValidationError) {
+                return res.status(400).json({ error: validationError.message, code: 'INVALID_INPUT' });
+            }
+            throw validationError;
+        }
+
         // Upsert holidays (insert or update on conflict)
         const { error } = await supabase
             .from('public_holidays')
-            .upsert(holidays.map(h => ({ date: h.date, name: h.name })), { onConflict: 'date' });
+            .upsert(cleaned, { onConflict: 'date' });
         
         if (error) throw error;
         
@@ -79,7 +114,11 @@ router.post('/', async (req, res) => {
 router.delete('/:date', async (req, res) => {
     try {
         const { date } = req.params;
-        
+
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return res.status(400).json({ error: 'date must be like 2026-03-31', code: 'INVALID_INPUT' });
+        }
+
         const { error } = await supabase
             .from('public_holidays')
             .delete()

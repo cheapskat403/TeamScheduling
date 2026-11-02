@@ -5,6 +5,7 @@ const { toCamelCase } = require('../utils/helpers');
 const logger = require('../utils/logger');
 const { requireAuthForWrites } = require('../middleware/requireAuth');
 const { todayInOffice } = require('../utils/dates');
+const { validateBody } = require('../utils/validate');
 const crypto = require('crypto');
 
 /** Identity of the caller: the verified Azure AD user when signed in, otherwise null */
@@ -44,7 +45,7 @@ router.get('/', async (req, res) => {
 /**
  * Create a desk booking (full day)
  */
-router.post('/', async (req, res) => {
+router.post('/', validateBody('deskBooking'), async (req, res) => {
     try {
         const { deskId, date, teamId } = req.body;
         // A verified sign-in always wins over whatever the client typed
@@ -201,8 +202,11 @@ router.post('/:id/checkin', async (req, res) => {
         }
 
         // Only the booking owner can check in
+        // (when logins are enforced, a login without a usable email cannot check in someone else's booking either)
         const email = callerEmail(req);
-        if (email && booking.employee_email && booking.employee_email.toLowerCase() !== email) {
+        const signedIn = req.user && req.user.authenticated;
+        const bookedBy = booking.employee_email && booking.employee_email.toLowerCase();
+        if (bookedBy && (signedIn ? email !== bookedBy : (email && email !== bookedBy))) {
             return res.status(403).json({ error: 'This desk is booked by someone else' });
         }
 

@@ -432,4 +432,33 @@ describe('Booking rules', () => {
             .send({ qrCode: 'QR1' })
             .expect(403);
     });
+
+    test('the person who booked the desk can check in (email compared ignoring case)', async () => {
+        mockData.desk_bookings = [
+            { id: 'b1', desk_id: 'd1', date: todayInOffice(), employee_email: 'JANE@example.com', checked_in: false }
+        ];
+        await request(mkApp(signedIn)).post('/api/desk-bookings/b1/checkin')
+            .send({ qrCode: 'QR1' })
+            .expect(200);
+        expect(mockData.desk_bookings[0].checked_in).toBe(true);
+    });
+
+    test('a login with no email cannot check in a booking that has an email', async () => {
+        mockData.desk_bookings = [
+            { id: 'b1', desk_id: 'd1', date: todayInOffice(), employee_email: 'jane@example.com', checked_in: false }
+        ];
+        await request(mkApp({ authenticated: true, name: 'No Email' })).post('/api/desk-bookings/b1/checkin')
+            .send({ qrCode: 'QR1' })
+            .expect(403);
+        expect(mockData.desk_bookings[0].checked_in).toBe(false);
+    });
+
+    test('a right code from the wrong person is still refused (stolen sticker photo)', async () => {
+        mockData.desk_bookings = [
+            { id: 'b1', desk_id: 'd1', date: todayInOffice(), employee_email: 'jane@example.com', checked_in: false }
+        ];
+        await request(mkApp({ authenticated: true, email: 'mallory@example.com' })).post('/api/desk-bookings/b1/checkin')
+            .send({ qrCode: 'QR1' })
+            .expect(403);
+    });
 });

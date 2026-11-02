@@ -8,6 +8,7 @@ const router = express.Router();
 const { supabase } = require('../config/supabase');
 const logger = require('../utils/logger');
 const { requireAuthForWrites } = require('../middleware/requireAuth');
+const { settingValue, ValidationError } = require('../utils/validate');
 
 // Apply auth middleware - GET allowed without auth, PUT requires auth
 router.use(requireAuthForWrites);
@@ -50,20 +51,16 @@ router.get('/:key', async (req, res) => {
 router.put('/:key', async (req, res) => {
     try {
         const { key } = req.params;
-        const { value } = req.body;
-        
-        if (value === undefined) {
-            return res.status(400).json({ error: 'Value is required' });
-        }
-        
-        // Validate known settings
-        if (key === 'team_roles') {
-            if (!Array.isArray(value)) {
-                return res.status(400).json({ error: 'team_roles must be an array' });
+
+        // Checks the name, and the value for the settings we know (team roles, floor plan backgrounds)
+        let value;
+        try {
+            value = settingValue(key, req.body && req.body.value);
+        } catch (validationError) {
+            if (validationError instanceof ValidationError) {
+                return res.status(400).json({ error: validationError.message, code: 'INVALID_INPUT' });
             }
-            if (!value.every(v => typeof v === 'string')) {
-                return res.status(400).json({ error: 'team_roles must be an array of strings' });
-            }
+            throw validationError;
         }
         
         const { data, error } = await supabase
