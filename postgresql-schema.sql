@@ -1,6 +1,6 @@
--- PostgreSQL Schema for Office Booking System
--- Run this in your PostgreSQL database (not Supabase)
--- Usage: psql -U office_app -d office_booking -f postgresql-schema.sql
+-- PostgreSQL Schema for Office Booking System (plain PostgreSQL, e.g. Azure Database for PostgreSQL)
+-- Same tables as supabase-schema.sql, without the Supabase-only parts (RLS, anon/authenticated roles).
+-- Usage: psql "$DATABASE_URL" -f postgresql-schema.sql   (or: node scripts/migrate-supabase-to-postgres.js --schema-only)
 
 -- ============================================
 -- LOCATIONS TABLE
@@ -135,21 +135,6 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ============================================
--- GRANT PERMISSIONS
--- ============================================
--- Grant all privileges to application user
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO office_app;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO office_app;
-GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO office_app;
-
--- Grant privileges on future tables
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO office_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO office_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO office_app;
-
--- Note: Row Level Security (RLS) is a Supabase-specific feature
--- For PostgreSQL, use standard GRANT/REVOKE permissions instead
--- If you need RLS, you can enable it per table:
--- ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow all on locations" ON locations FOR ALL USING (true) WITH CHECK (true);
+-- No GRANT statements: run this as the application's own database user, which then owns the tables.
+-- Row Level Security is a Supabase feature and is not used here; access is controlled by the database
+-- user's credentials and the network firewall.
