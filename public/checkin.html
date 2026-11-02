@@ -197,7 +197,56 @@
         <a href="/" class="back-link">← Back to booking system</a>
     </div>
     
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
     <script>
+        // ---- Sign-in: checking in needs a login, so we know the person is the one who booked the desk.
+        // Uses the same Microsoft app and browser storage as the main app, so if you are already signed
+        // in there you are signed in here. Scanning the QR while signed out sends you to Microsoft and back.
+        let msalApp = null;
+        let signedInAccount = null;
+        let authRequired = false;
+
+        async function ensureSignedIn() {
+            const response = await fetch('/api/auth/config');
+            const config = await response.json();
+            if (!config.configured) return;          // Azure AD is not set up on this server: no login to ask for
+            authRequired = true;
+
+            msalApp = new msal.PublicClientApplication({
+                auth: {
+                    clientId: config.clientId,
+                    authority: config.authority,
+                    redirectUri: config.redirectUri,
+                    navigateToLoginRequestUrl: true
+                },
+                cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true }
+            });
+            await msalApp.initialize();
+            const redirected = await msalApp.handleRedirectPromise();
+            signedInAccount = redirected ? redirected.account : (msalApp.getAllAccounts()[0] || null);
+            if (!signedInAccount) {
+                // Goes to Microsoft and comes back to this same page (same ?code=)
+                await msalApp.loginRedirect({ scopes: ['openid', 'profile', 'email'] });
+            }
+        }
+
+        async function getIdToken() {
+            if (!authRequired || !msalApp || !signedInAccount) return null;
+            try {
+                const result = await msalApp.acquireTokenSilent({ scopes: ['openid', 'profile', 'email'], account: signedInAccount });
+                return result.idToken || null;
+            } catch (error) {
+                await msalApp.acquireTokenRedirect({ scopes: ['openid', 'profile', 'email'], account: signedInAccount });
+                return null;
+            }
+        }
+
+        // Everything that came from the server is escaped before it goes into the page
+        function esc(value) {
+            if (value === null || value === undefined) return '';
+            return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
         const urlParams = new URLSearchParams(window.location.search);
         const qrCode = urlParams.get('code');
         
@@ -210,7 +259,7 @@
             }
             
             try {
-                const response = await fetch(`/api/checkin/${qrCode}`);
+                const response = await fetch(`/api/checkin/${encodeURIComponent(qrCode)}`);
                 
                 if (!response.ok) {
                     throw new Error('Desk not found');
@@ -220,7 +269,7 @@
                 renderDeskInfo(data);
                 
             } catch (error) {
-                content.innerHTML = `<div class="message error">${error.message || 'Failed to load desk information'}</div>`;
+                content.innerHTML = `<div class="message error">${esc(error.message || 'Failed to load desk information')}</div>`;
             }
         }
         
@@ -233,11 +282,11 @@
             
             let html = `
                 <h1>Desk Check-In</h1>
-                <div class="desk-name">${desk.name}</div>
+                <div class="desk-name">${esc(desk.name)}</div>
                 <div class="location">
-                    ${location?.name || 'Unknown Location'}
-                    ${desk.floor ? ` • Floor ${desk.floor}` : ''}
-                    ${desk.zone ? ` • ${desk.zone}` : ''}
+                    ${esc(location?.name || 'Unknown Location')}
+                    ${desk.floor ? ` • Floor ${esc(desk.floor)}` : ''}
+                    ${desk.zone ? ` • ${esc(desk.zone)}` : ''}
                 </div>
             `;
             
@@ -252,13 +301,13 @@
                     html += `
                         <div class="booking-card active">
                             <div class="booking-time">Full Day</div>
-                            <div class="booking-person">${booking.employeeName}</div>
+                            <div class="booking-person">${esc(booking.employeeName)}</div>
                             ${booking.checkedIn 
                                 ? '<span class="booking-status status-checked-in">✓ Checked In</span>'
                                 : '<span class="booking-status status-pending">Pending</span>'
                             }
                             ${canCheckIn ? `
-                                <button class="btn" onclick="checkIn('${booking.id}')">
+                                <button class="btn" data-booking-id="${esc(booking.id)}">
                                     Check In Now
                                 </button>
                             ` : ''}
@@ -268,13 +317,19 @@
             }
             
             content.innerHTML = html;
+            content.querySelectorAll('button[data-booking-id]').forEach(button => {
+                button.addEventListener('click', () => checkIn(button.dataset.bookingId));
+            });
         }
         
         async function checkIn(bookingId) {
             try {
-                const response = await fetch(`/api/desk-bookings/${bookingId}/checkin`, {
+                const headers = { 'Content-Type': 'application/json' };
+                const token = await getIdToken();
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                const response = await fetch(`/api/desk-bookings/${encodeURIComponent(bookingId)}/checkin`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers,
                     body: JSON.stringify({ qrCode })
                 });
                 
@@ -292,8 +347,10 @@
             }
         }
         
-        // Load on page load
-        loadDeskInfo();
+        // Sign in first (if needed), then load the desk
+        ensureSignedIn()
+            .catch(error => console.error('Sign-in setup failed:', error))
+            .then(() => loadDeskInfo());
     </script>
 </body>
 </html>

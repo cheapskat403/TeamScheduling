@@ -2,10 +2,18 @@
 
 // Utility function to escape HTML (XSS prevention)
 function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    if (text === null || text === undefined) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/** A hex colour such as #3b82f6, or the fallback. Use for any colour that ends up in a style or attribute. */
+function safeColor(value, fallback = '') {
+    return typeof value === 'string' && /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value) ? value : fallback;
 }
 
 // Config will be loaded from server
@@ -137,6 +145,14 @@ async function signIn() {
 function signOut() {
     if (!msalInstance) return;
     
+    // Remove what we cached about the person (name, email, photos) so the next user of this browser doesn't see it
+    try {
+        ['employeeName', 'employeeEmail', 'employeePhoto', 'employeeTeamId', 'employeeTeamSkipped', 'userName', 'myUserId'].forEach(key => localStorage.removeItem(key));
+        Object.keys(localStorage)
+            .filter(key => key.startsWith('deskPhoto:'))
+            .forEach(key => localStorage.removeItem(key));
+    } catch (e) { /* storage not available: nothing to clear */ }
+
     const logoutRequest = {
         account: currentAccount,
         postLogoutRedirectUri: msalConfig.auth.postLogoutRedirectUri
@@ -515,7 +531,11 @@ function showUserUI(user) {
     
     if (userAvatar) {
         if (user.photo) {
-            userAvatar.innerHTML = `<img src="${user.photo}" alt="${escapeHtml(user.name)}">`;
+            userAvatar.textContent = '';
+            const photoImg = document.createElement('img');
+            photoImg.src = user.photo;
+            photoImg.alt = user.name || '';
+            userAvatar.appendChild(photoImg);
         } else {
             const initials = user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
             userAvatar.innerHTML = `<span>${escapeHtml(initials)}</span>`;

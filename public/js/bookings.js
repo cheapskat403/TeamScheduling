@@ -4,7 +4,7 @@
  */
 
 import { state, elements } from './state.js';
-import { formatDateStr, formatDisplayDate, showToast, getBookingPeopleCount, getInitials, escapeHtml } from './utils.js';
+import { formatDateStr, formatDisplayDate, showToast, getBookingPeopleCount, getInitials, escapeHtml, safeColor } from './utils.js';
 import { createBooking, updateBooking, deleteBookingApi, invalidateBookingsCache, loadBookingsForMonth } from './api.js';
 import { renderCalendar } from './calendar.js';
 import { validateBooking, showValidationErrors } from './validation.js';
@@ -103,7 +103,7 @@ export function renderDayBookings(dateStr) {
         const notes = isOverbooked ? booking.notes.replace('[OVERBOOKED] ', '') : booking.notes;
         
         return `
-            <div class="booking-item ${isOverbooked ? 'overbooked' : ''}" style="background: ${escapeHtml(color)};">
+            <div class="booking-item ${isOverbooked ? 'overbooked' : ''}" style="background: ${safeColor(color, '#6B7280')};">
                 <div class="booking-header">
                     <div class="booking-info">
                         <strong>${escapeHtml(displayName)}</strong>
