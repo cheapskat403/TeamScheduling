@@ -10,6 +10,11 @@ let socket = null;
 let previousViewerIds = new Set(); // Track previous viewers for animation
 let viewersJustRemoved = false; // Track if viewers were just removed for reverse bump
 
+// The Desks page has its own presence room (desks:<location>). While it is open the connection is in that
+// room instead of the calendar's month room, and goes back to the calendar room when the page is left.
+let desksActive = false;
+let deskMode = { mode: 'viewing', floor: null };   // what we are doing there: viewing, or editing the layout
+
 /**
  * Initialize Socket.IO connection
  */
@@ -92,6 +97,7 @@ export function initSocket() {
         socket.on('connect', () => {
             authRetries = 0;
             console.log('Socket connected for user:', userName);
+            state.currentRoom = null;   // a new connection is in no room yet, even if the page thinks it is
             joinCurrentRoom();
         });
 
@@ -104,6 +110,14 @@ export function initSocket() {
         });
 
         socket.on('presence:update', ({ roomKey, viewers }) => {
+            if (typeof roomKey === 'string' && roomKey.startsWith('desks:')) {
+                if (desksActive && roomKey === currentDeskRoomKey()) {
+                    state.deskViewers = viewers;
+                    renderDeskViewers();
+                }
+                return;
+            }
+            if (desksActive) return;   // a calendar update that arrived as we moved to the Desks page
             // Include all viewers (including current user)
             state.viewers = viewers;
             renderViewers();
@@ -127,8 +141,10 @@ export function joinCurrentRoom() {
     const year = state.currentDate.getFullYear();
     const month = state.currentDate.getMonth();
     const locationId = state.currentLocation;
-    const roomKey = `presence:${locationId}:${year}-${String(month + 1).padStart(2, '0')}`;
-    
+    const roomKey = desksActive
+        ? currentDeskRoomKey()
+        : `presence:${locationId}:${year}-${String(month + 1).padStart(2, '0')}`;
+
     if (roomKey === state.currentRoom) {
         console.log('Already in room:', roomKey);
         return;
@@ -146,16 +162,149 @@ export function joinCurrentRoom() {
     };
     
     // Update local state to include current user
-    if (!state.viewers.find(v => v.id === state.myUserId)) {
+    if (desksActive) {
+        state.deskViewers = [{ ...currentUser, mode: deskMode.mode, floor: deskMode.floor }];
+        renderDeskViewers();
+    } else if (!state.viewers.find(v => v.id === state.myUserId)) {
         state.viewers.push(currentUser);
         renderViewers();
     }
-    
+
     socket.emit('presence:join', {
         roomKey,
         user: currentUser
     });
+    if (desksActive) sendDeskState();
 }
+
+// ------------------------------------------------------------------ Desks page presence
+
+const currentDeskRoomKey = () => `desks:${state.currentLocation}`;
+
+function sendDeskState() {
+    if (socket && socket.connected && desksActive) {
+        socket.emit('presence:state', { mode: deskMode.mode, floor: deskMode.floor });
+    }
+}
+
+/** The Desks page was opened (or came back): move this connection into the desks room */
+export function enterDesksPresence(mode = 'viewing', floor = null) {
+    deskMode = { mode, floor: floor === null || floor === undefined ? null : String(floor) };
+    if (desksActive) {
+        sendDeskState();
+        return;
+    }
+    desksActive = true;
+    state.deskViewers = [];
+    state.currentRoom = null;
+    joinCurrentRoom();
+}
+
+/** Say what we are doing on the Desks page: 'viewing' or 'editing' (the layout), and which floor */
+export function setDesksPresenceState(mode, floor) {
+    deskMode = { mode, floor: floor === null || floor === undefined ? null : String(floor) };
+    const me = (state.deskViewers || []).find(v => v.id === state.myUserId);
+    if (me) { me.mode = deskMode.mode; me.floor = deskMode.floor; renderDeskViewers(); }
+    sendDeskState();
+}
+
+/** The Desks page was left: go back to the calendar's room */
+export function leaveDesksPresence() {
+    if (!desksActive) return;
+    desksActive = false;
+    state.deskViewers = [];
+    renderDeskViewers();
+    state.currentRoom = null;
+    joinCurrentRoom();
+}
+
+const MAX_DESK_AVATARS = 5;
+
+function deskStatus(viewer) {
+    const floor = viewer.floor ? ` on floor ${viewer.floor}` : '';
+    return viewer.mode === 'editing' ? `editing the layout${floor}` : `viewing${floor}`;
+}
+
+function deskAvatarHtml(viewer, extraClass = '') {
+    const cls = `presence-avatar${viewer.mode === 'editing' ? ' presence-editing' : ''}${extraClass}`;
+    const title = `${escapeHtml(viewer.name)} (${escapeHtml(deskStatus(viewer))})`;
+    const photo = safeImageSrc(viewer.photo);
+    return photo
+        ? `<div class="${cls} presence-avatar-photo" title="${title}"><img src="${escapeHtml(photo)}" alt="${escapeHtml(viewer.name)}" loading="lazy"></div>`
+        : `<div class="${cls}" style="background: ${safeColor(viewer.color, '#6B7280')}" title="${title}">${escapeHtml(String(viewer.name || '?').charAt(0).toUpperCase())}</div>`;
+}
+
+function namesList(names) {
+    if (names.length <= 1) return names[0] || '';
+    if (names.length === 2) return `${names[0]} and ${names[1]}`;
+    return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/** Who is on the Desks page, with a notice when other people are editing the layout */
+export function renderDeskViewers() {
+    const container = document.getElementById('deskPresenceAvatars');
+    if (!container) return;
+    const countElement = document.getElementById('deskPresenceCount');
+    const notice = document.getElementById('deskEditingNotice');
+    const bar = document.getElementById('deskPresenceBar');
+
+    const viewers = desksActive ? [...(state.deskViewers || [])] : [];
+    // You always see yourself first, then the others
+    viewers.sort((a, b) => (b.id === state.myUserId) - (a.id === state.myUserId));
+
+    const shown = viewers.slice(0, MAX_DESK_AVATARS);
+    const overflow = viewers.length - shown.length;
+    container.innerHTML = shown.map(v => deskAvatarHtml(v)).join('') +
+        (overflow > 0 ? `<div class="presence-avatar presence-overflow" title="${overflow} more">+${overflow}</div>` : '');
+    if (countElement) countElement.textContent = viewers.length ? viewers.length : '';
+    if (bar) bar.classList.toggle('presence-empty', viewers.length === 0);
+
+    // Hover list with everyone's name and what they are doing
+    let expanded = document.getElementById('deskPresenceExpanded');
+    if (!expanded) {
+        expanded = document.createElement('div');
+        expanded.id = 'deskPresenceExpanded';
+        expanded.className = 'presence-expanded';
+        document.body.appendChild(expanded);
+    }
+    expanded.innerHTML = viewers.map(v => `<div class="presence-expanded-item">${deskAvatarHtml(v)}<span class="presence-expanded-name">${escapeHtml(v.name)}${v.id === state.myUserId ? ' (you)' : ''}<small class="presence-status">${escapeHtml(deskStatus(v))}</small></span></div>`).join('');
+    if (bar && !bar._deskHoverWired) {
+        bar._deskHoverWired = true;
+        const show = () => {
+            if (!expanded.children.length) return;
+            const rect = bar.getBoundingClientRect();
+            expanded.style.display = 'block';
+            expanded.style.top = `${rect.bottom + 8}px`;
+            expanded.style.left = `${Math.max(8, rect.right - 240)}px`;
+            expanded.classList.add('visible');
+        };
+        const hide = () => setTimeout(() => {
+            if (!expanded.matches(':hover') && !bar.matches(':hover')) { expanded.classList.remove('visible'); expanded.style.display = 'none'; }
+        }, 150);
+        bar.addEventListener('mouseenter', show);
+        bar.addEventListener('mouseleave', hide);
+        expanded.addEventListener('mouseleave', hide);
+    }
+    if (!viewers.length) expanded.style.display = 'none';
+
+    // Heads-up when somebody else is editing the layout (two people editing at once can overwrite each other)
+    if (notice) {
+        const others = viewers.filter(v => v.mode === 'editing' && v.id !== state.myUserId).map(v => v.name);
+        const iAmEditing = viewers.some(v => v.mode === 'editing' && v.id === state.myUserId);
+        if (others.length === 0) {
+            notice.hidden = true;
+            notice.textContent = '';
+        } else {
+            notice.hidden = false;
+            notice.textContent = iAmEditing
+                ? `${namesList(others)} ${others.length === 1 ? 'is' : 'are'} also editing the layout. Changes you both make can overwrite each other.`
+                : `${namesList(others)} ${others.length === 1 ? 'is' : 'are'} editing the layout right now, so the floor plan may change.`;
+        }
+    }
+}
+
+// floor-plan.js and views.js are not modules, so they reach these through window
+window.deskPresence = { enter: enterDesksPresence, setState: setDesksPresenceState, leave: leaveDesksPresence };
 
 /**
  * Render presence indicators (viewers)

@@ -430,6 +430,11 @@
                         <p id="desksSubtitle" class="desks-subtitle"></p>
                     </div>
                     <div class="desks-controls">
+                        <div class="presence desks-presence presence-empty" id="deskPresenceBar">
+                            <span class="presence-label">On this page:</span>
+                            <div class="presence-avatars" id="deskPresenceAvatars"></div>
+                            <span class="presence-count" id="deskPresenceCount"></span>
+                        </div>
                         <select id="floorSelect" class="floor-select" aria-label="Floor">
                             <option value="1">1st Floor</option>
                         </select>
@@ -442,6 +447,9 @@
                         </button>
                     </div>
                 </header>
+
+                <!-- Shown when someone else is editing the layout -->
+                <div id="deskEditingNotice" class="desk-editing-notice" role="status" hidden></div>
 
                 <!-- Day strip -->
                 <div id="dayStripBar" class="day-strip-bar">

@@ -286,6 +286,7 @@ function initDesksView() {
 
         floorSelect.addEventListener('change', (e) => {
             deskState.currentFloor = e.target.value;
+            window.deskPresence?.setState(deskState.editMode ? 'editing' : 'viewing', deskState.currentFloor);
             deskState.suggestion = null;
             deskState.view = { zoom: 1, panX: 0, panY: 0 };
             hideDeskCard();
@@ -359,6 +360,9 @@ function initDesksView() {
         desksViewInitialized = true;
     }
 
+    // Show who else is on this page, and tell them what we are doing here
+    window.deskPresence?.enter(deskState.editMode ? 'editing' : 'viewing', deskState.currentFloor);
+
     // Populate assigned team dropdown (sorted alphabetically)
     const teamSelect = document.getElementById('assignedTeamId');
     if (teamSelect) {
@@ -392,6 +396,7 @@ function updateFloorSelector() {
 
 function toggleEditMode() {
     deskState.editMode = !deskState.editMode;
+    window.deskPresence?.setState(deskState.editMode ? 'editing' : 'viewing', deskState.currentFloor);
     const editPanel = document.getElementById('editModePanel');
     const toggleBtn = document.getElementById('toggleEditMode');
     const floorMap = document.getElementById('floorMap');

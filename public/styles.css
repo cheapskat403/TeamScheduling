@@ -5949,3 +5949,21 @@ body:not(.can-calendar) .calendar-edit { display: none !important; }
 .audit-old { color: var(--danger); text-decoration: line-through; }
 .audit-new { color: var(--success); }
 .audit-note-new { color: var(--success); }
+
+/* ============================================
+   Presence on the Desks page
+   ============================================ */
+.desks-presence { margin: 0; }
+.desks-presence.presence-empty { display: none; }
+.presence-avatar.presence-editing { box-shadow: 0 0 0 2px var(--accent-primary); }
+.presence-status { display: block; font-size: 0.75rem; font-weight: 400; color: var(--text-muted); }
+.desk-editing-notice {
+    margin: 0 0 var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: 8px;
+    border: 1px solid var(--accent-primary);
+    background: var(--accent-glow);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+.desk-editing-notice[hidden] { display: none; }

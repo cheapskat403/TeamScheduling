@@ -36,6 +36,8 @@ export async function switchView(viewName, { updateUrl = true } = {}) {
     // Cleanup event listeners from previous view
     if (currentView && currentView !== viewName) {
         cleanupView(currentView);
+        // Leaving the Desks page: go back to the calendar's presence room
+        if (currentView === 'desks') window.deskPresence?.leave();
     }
     
     // Update current view
