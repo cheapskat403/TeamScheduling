@@ -135,9 +135,12 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 -- ============================================
--- ROW LEVEL SECURITY (Optional but recommended)
+-- ROW LEVEL SECURITY
 -- ============================================
--- Enable RLS on all tables (you can customize policies later)
+-- The app talks to the database with the SECRET (service_role) key, which is not limited by row level
+-- security. So the tables are locked: RLS is on and there are NO policies, which means the public anon
+-- key (and logged-in Supabase users) can do nothing. Do NOT add "allow all" policies back: they would
+-- let anyone holding the anon key read and change every row directly, skipping the app's login.
 ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
@@ -145,16 +148,4 @@ ALTER TABLE public_holidays ENABLE ROW LEVEL SECURITY;
 ALTER TABLE desks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE desk_bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE floor_elements ENABLE ROW LEVEL SECURITY;
-
--- Create policies that allow all operations (adjust for your security needs)
--- For a public booking system, you might want these to be open:
-CREATE POLICY "Allow all on locations" ON locations FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all on teams" ON teams FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all on bookings" ON bookings FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all on public_holidays" ON public_holidays FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all on desks" ON desks FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all on desk_bookings" ON desk_bookings FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all on floor_elements" ON floor_elements FOR ALL USING (true) WITH CHECK (true);
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all on settings" ON settings FOR ALL USING (true) WITH CHECK (true);
-

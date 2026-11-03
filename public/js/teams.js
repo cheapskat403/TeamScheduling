@@ -4,7 +4,7 @@
  */
 
 import { state, elements } from './state.js';
-import { showToast, getAvatarHTML, getInitials, adjustColor, escapeHtml } from './utils.js';
+import { showToast, getAvatarHTML, getInitials, adjustColor, escapeHtml, safeColor, safeImageSrc } from './utils.js';
 import { createTeam, updateTeam, deleteTeamApi, invalidateBookingsCache, loadBookingsForMonth } from './api.js';
 import { renderCalendar } from './calendar.js';
 import { validateTeam, showValidationErrors } from './validation.js';
@@ -107,11 +107,11 @@ export function renderTeamsList() {
             
             html += `
                 <div class="team-card">
-                    <div class="team-card-header" style="background: linear-gradient(135deg, ${escapeHtml(team.color)}, ${adjustColor(team.color, -30)})">
+                    <div class="team-card-header" style="background: linear-gradient(135deg, ${safeColor(team.color, '#6B7280')}, ${adjustColor(team.color, -30)})">
                         ${avatarHtml}
                         <div class="team-card-info">
                             <h4>${escapeHtml(team.name)}</h4>
-                            <span class="team-member-count">${team.memberCount} members</span>
+                            <span class="team-member-count">${escapeHtml(team.memberCount)} members</span>
                         </div>
                     </div>
                     ${team.manager ? `<div class="team-manager-row"><span>Manager:</span> ${escapeHtml(team.manager)}</div>` : ''}
@@ -138,11 +138,11 @@ export function renderTeamsList() {
             
             html += `
                 <div class="team-card">
-                    <div class="team-card-header" style="background: linear-gradient(135deg, ${escapeHtml(team.color)}, ${adjustColor(team.color, -30)})">
+                    <div class="team-card-header" style="background: linear-gradient(135deg, ${safeColor(team.color, '#6B7280')}, ${adjustColor(team.color, -30)})">
                         ${avatarHtml}
                         <div class="team-card-info">
                             <h4>${escapeHtml(team.name)}</h4>
-                            <span class="team-member-count">${team.memberCount} members</span>
+                            <span class="team-member-count">${escapeHtml(team.memberCount)} members</span>
                         </div>
                     </div>
                     ${team.manager ? `<div class="team-manager-row"><span>Manager:</span> ${escapeHtml(team.manager)}</div>` : ''}
@@ -243,7 +243,7 @@ export function editTeam(id) {
     if (preview && team.manager) {
         preview.innerHTML = `
             <div class="selected-manager-info">
-                ${team.managerImage ? `<img src="${team.managerImage}" alt="${escapeHtml(team.manager)}">` : `<div class="manager-photo-placeholder">${escapeHtml(team.manager.charAt(0))}</div>`}
+                ${safeImageSrc(team.managerImage) ? `<img src="${escapeHtml(safeImageSrc(team.managerImage))}" alt="${escapeHtml(team.manager)}">` : `<div class="manager-photo-placeholder">${escapeHtml(team.manager.charAt(0))}</div>`}
                 <div>
                     <strong>${escapeHtml(team.manager)}</strong>
                 </div>
@@ -330,11 +330,11 @@ export function showTeamTooltip(event, teamId) {
     const avatarHtml = getAvatarHTML(team.manager, team.managerImage, team.color, 'tooltip-avatar');
     
     tooltip.innerHTML = `
-        <div class="tooltip-header" style="background: linear-gradient(135deg, ${escapeHtml(team.color)}, ${adjustColor(team.color, -30)})">
+        <div class="tooltip-header" style="background: linear-gradient(135deg, ${safeColor(team.color, '#6B7280')}, ${adjustColor(team.color, -30)})">
             ${avatarHtml}
             <div class="tooltip-info">
                 <strong>${escapeHtml(team.name)}</strong>
-                <span>${team.memberCount} members</span>
+                <span>${escapeHtml(team.memberCount)} members</span>
             </div>
         </div>
         ${team.manager ? `<div class="tooltip-manager">Manager: ${escapeHtml(team.manager)}</div>` : ''}

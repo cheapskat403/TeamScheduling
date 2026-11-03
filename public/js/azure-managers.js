@@ -3,7 +3,7 @@
  * Integration for selecting team managers from Azure AD
  */
 
-import { showToast, escapeHtml } from './utils.js';
+import { showToast, escapeHtml, safeImageSrc } from './utils.js';
 import { apiGet, apiPut } from './fetch-utils.js';
 
 // Allowed team roles (job titles that can lead teams)
@@ -124,7 +124,7 @@ function renderAvailableTitles() {
     }
     
     container.innerHTML = availableTitles.map(title => `
-        <div class="job-title-item" data-role="${escapeHtml(title)}" onclick="toggleTeamRole('${escapeHtml(title)}', this)">
+        <div class="job-title-item" data-role="${escapeHtml(title)}">
             <span>${escapeHtml(title)}</span>
             <button class="add-role-btn" title="Add to allowed roles">
                 <span class="btn-text">+</span>
@@ -132,6 +132,12 @@ function renderAvailableTitles() {
             </button>
         </div>
     `).join('');
+
+    // One listener for the list; the job title is read from data-role, never built into script text
+    container.onclick = (event) => {
+        const item = event.target.closest('.job-title-item');
+        if (item && container.contains(item)) toggleTeamRole(item.dataset.role, item);
+    };
 }
 
 /**
@@ -152,7 +158,7 @@ export function renderAllowedRolesList() {
     container.innerHTML = sortedRoles.map(role => `
         <div class="allowed-role-item" data-role="${escapeHtml(role)}">
             <span>${escapeHtml(role)}</span>
-            <button class="remove-role-btn" onclick="toggleTeamRole('${escapeHtml(role)}', this.parentElement)" title="Remove">
+            <button class="remove-role-btn" title="Remove">
                 <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
                     <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -161,6 +167,12 @@ export function renderAllowedRolesList() {
             </button>
         </div>
     `).join('');
+
+    container.onclick = (event) => {
+        const button = event.target.closest('.remove-role-btn');
+        const item = button && button.closest('.allowed-role-item');
+        if (item && container.contains(item)) toggleTeamRole(item.dataset.role, item);
+    };
 }
 
 // Track saving state to prevent double-clicks
@@ -292,14 +304,21 @@ export async function openManagerSelector() {
             
             // Render managers first, then load photos
             dropdown.innerHTML = managers.map(m => `
-                <div class="manager-option" data-manager-id="${m.id}" onclick="selectManager('${m.id}', '${escapeHtml(m.displayName)}', '${escapeHtml(m.jobTitle || '')}', '${escapeHtml(m.mail || '')}')">
-                    <div class="manager-photo-placeholder" data-photo-id="${m.id}">${m.displayName.charAt(0)}</div>
+                <div class="manager-option" data-manager-id="${escapeHtml(m.id)}" data-name="${escapeHtml(m.displayName)}" data-title="${escapeHtml(m.jobTitle || '')}" data-email="${escapeHtml(m.mail || '')}">
+                    <div class="manager-photo-placeholder" data-photo-id="${escapeHtml(m.id)}">${escapeHtml(m.displayName.charAt(0))}</div>
                     <div class="manager-info">
                         <strong>${escapeHtml(m.displayName)}</strong>
                         <span>${escapeHtml(m.jobTitle || 'No title')}</span>
                     </div>
                 </div>
             `).join('');
+
+            dropdown.onclick = (event) => {
+                const option = event.target.closest('.manager-option');
+                if (option && dropdown.contains(option)) {
+                    selectManager(option.dataset.managerId, option.dataset.name, option.dataset.title, option.dataset.email);
+                }
+            };
             
             // Load photos asynchronously
             loadManagerPhotos(managers);
@@ -318,7 +337,7 @@ async function loadManagerPhotos(managers) {
             if (typeof fetchUserPhotoById === 'function') {
                 const photoUrl = await fetchUserPhotoById(manager.id);
                 if (photoUrl) {
-                    const placeholder = document.querySelector(`[data-photo-id="${manager.id}"]`);
+                    const placeholder = document.querySelector(`[data-photo-id="${CSS.escape(String(manager.id))}"]`);
                     if (placeholder) {
                         const img = document.createElement('img');
                         img.src = photoUrl;
@@ -403,10 +422,10 @@ export async function selectManager(id, name, title, email) {
     if (preview) {
         preview.innerHTML = `
             <div class="selected-manager-info">
-                ${photoUrl ? `<img src="${photoUrl}" alt="${name}">` : `<div class="manager-photo-placeholder">${name.charAt(0)}</div>`}
+                ${safeImageSrc(photoUrl) ? `<img src="${escapeHtml(safeImageSrc(photoUrl))}" alt="${escapeHtml(name)}">` : `<div class="manager-photo-placeholder">${escapeHtml(name.charAt(0))}</div>`}
                 <div>
-                    <strong>${name}</strong>
-                    ${title ? `<span>${title}</span>` : ''}
+                    <strong>${escapeHtml(name)}</strong>
+                    ${title ? `<span>${escapeHtml(title)}</span>` : ''}
                     ${directReportsCount > 0 ? `<span class="direct-reports-hint">${directReportsCount} direct reports</span>` : ''}
                 </div>
             </div>

@@ -50,7 +50,11 @@ app.set('trust proxy', 1);
 
 // Create HTTP server and Socket.IO
 const httpServer = http.createServer(app);
-const io = new Server(httpServer, { cors: { origin: true, credentials: true } });
+// Pages are served from this same server, so cross-origin access is off unless CORS_ORIGINS lists origins
+const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
+const corsOrigin = allowedOrigins.length ? allowedOrigins : false;
+
+const io = new Server(httpServer, { cors: { origin: corsOrigin } });
 
 // Websockets need a valid login too when REQUIRE_AUTH=true
 io.use(socketAuth());
@@ -73,9 +77,9 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://alcdn.msauth.net", "https://unpkg.com"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://alcdn.msauth.net"],
             scriptSrcAttr: ["'unsafe-inline'"], // Allow inline event handlers (onclick, etc.)
-            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://unpkg.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "https:", "blob:"],
             connectSrc: ["'self'", "https://graph.microsoft.com", "https://login.microsoftonline.com", "wss:", "ws:"],
@@ -102,10 +106,10 @@ app.use('/api/', apiLimiter);
 app.use(compression());
 
 // Parse JSON bodies
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '1mb' }));
 
 // Enable CORS
-app.use(cors());
+app.use(cors({ origin: corsOrigin }));
 
 // Serve static files.
 // The page, scripts and styles are not fingerprinted, so they must be revalidated on every load

@@ -5346,6 +5346,12 @@ form {
     font-weight: 500;
 }
 
+.whos-in-team-empty {
+    font-weight: 400;
+    font-size: 0.78rem;
+    opacity: 0.7;
+}
+
 .whos-in-row {
     display: flex;
     align-items: center;
