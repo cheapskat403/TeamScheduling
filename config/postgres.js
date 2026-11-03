@@ -10,8 +10,11 @@ const { Pool, types } = require('pg');
 const logger = require('../utils/logger');
 const { PostgresClient } = require('../utils/pgQueryBuilder');
 
-// Return the same shapes Supabase does: DATE as 'YYYY-MM-DD' text, bigint and numeric as numbers.
+// Return the same shapes Supabase does: DATE as 'YYYY-MM-DD' text, timestamps as ISO text (a Date object
+// would be flattened to {} by toCamelCase), bigint and numeric as numbers.
 types.setTypeParser(1082, value => value);
+types.setTypeParser(1184, value => new Date(value).toISOString());
+types.setTypeParser(1114, value => new Date(`${value}Z`).toISOString());
 types.setTypeParser(20, value => Number(value));
 types.setTypeParser(1700, value => Number(value));
 
