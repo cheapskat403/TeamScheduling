@@ -105,6 +105,11 @@ CREATE TABLE IF NOT EXISTS desk_bookings (
 CREATE INDEX IF NOT EXISTS idx_desk_bookings_date_location ON desk_bookings(date, location_id);
 CREATE INDEX IF NOT EXISTS idx_desk_bookings_desk_date ON desk_bookings(desk_id, date);
 
+-- Two requests at the same moment can both pass the app's "is it free?" check, so the database refuses the second:
+-- a desk can be booked once per day, and a person (by email) can have one desk per day.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_desk_bookings_desk_date ON desk_bookings(desk_id, date);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_desk_bookings_person_date ON desk_bookings(date, lower(employee_email)) WHERE coalesce(employee_email, '') <> '';
+
 -- ============================================
 -- FLOOR ELEMENTS TABLE
 -- ============================================

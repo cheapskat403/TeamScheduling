@@ -183,7 +183,7 @@ class QueryBuilder {
         try {
             result = await this.pool.query(built.sql, built.params);
         } catch (error) {
-            return { data: null, error: { message: error.message, code: error.code, details: error.detail || null, hint: error.hint || null } };
+            return { data: null, error: { message: error.message, code: error.code, details: error.detail || null, hint: error.hint || null, constraint: error.constraint || null } };
         }
 
         const returnsRows = this.mode === 'select' || this.returning !== null;

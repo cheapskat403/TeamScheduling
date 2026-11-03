@@ -534,3 +534,30 @@ describe('Live updates to the Desks page', () => {
         await request(mkApp()).post('/api/desk-bookings').send({ deskId: 'd1', date: FUTURE, employeeName: 'John' }).expect(201);
     });
 });
+
+describe('Duplicate bookings refused by the database', () => {
+    test('a taken desk and a person who already has a desk get different messages', () => {
+        const { duplicateBookingMessage } = deskBookingsRouter;
+        // pg driver: the index name is on error.constraint
+        expect(duplicateBookingMessage({ code: '23505', constraint: 'uq_desk_bookings_desk_date' })).toBe('That desk was just taken. Pick another one.');
+        expect(duplicateBookingMessage({ code: '23505', constraint: 'uq_desk_bookings_person_date' })).toBe('You already have a desk booked for that day.');
+        // supabase-js: the index name is only in the message
+        expect(duplicateBookingMessage({ code: '23505', message: 'duplicate key value violates unique constraint "uq_desk_bookings_person_date"' }))
+            .toBe('You already have a desk booked for that day.');
+        expect(duplicateBookingMessage({ code: '23505', message: 'duplicate key value violates unique constraint "uq_desk_bookings_desk_date"' }))
+            .toBe('That desk was just taken. Pick another one.');
+        // anything else unique-ish falls back to the desk message
+        expect(duplicateBookingMessage({ code: '23505' })).toBe('That desk was just taken. Pick another one.');
+    });
+
+    test('the schemas create both unique indexes, and an upgrade script exists for older databases', () => {
+        const fs = require('fs');
+        const path = require('path');
+        const read = (...p) => fs.readFileSync(path.join(__dirname, '..', '..', ...p), 'utf8');
+        for (const file of [['scripts', 'postgres', '1-create-schema.sql'], ['supabase-schema.sql'], ['scripts', 'postgres', '5-prevent-double-booking.sql']]) {
+            const sql = read(...file);
+            expect(sql).toMatch(/CREATE UNIQUE INDEX IF NOT EXISTS uq_desk_bookings_desk_date\s+ON desk_bookings\s*\(desk_id, date\)/i);
+            expect(sql).toMatch(/CREATE UNIQUE INDEX IF NOT EXISTS uq_desk_bookings_person_date\s+ON desk_bookings\s*\(date, lower\(employee_email\)\)/i);
+        }
+    });
+});

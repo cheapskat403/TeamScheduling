@@ -162,6 +162,12 @@ describe('pgQueryBuilder', () => {
             expect(error).toMatchObject({ code: '23505', message: 'duplicate key', details: 'Key exists' });
         });
 
+        test('a unique violation says which rule was hit, so the app can explain it', async () => {
+            const { db } = makeDb([], Object.assign(new Error('duplicate key'), { code: '23505', constraint: 'uq_desk_bookings_desk_date' }));
+            const { error } = await db.from('desk_bookings').insert({ id: 'a' });
+            expect(error.constraint).toBe('uq_desk_bookings_desk_date');
+        });
+
         test('quote accepts normal names and rejects odd ones', () => {
             expect(quote('desk_bookings')).toBe('"desk_bookings"');
             expect(() => quote('a b')).toThrow();

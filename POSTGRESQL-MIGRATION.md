@@ -42,6 +42,8 @@ DBeaver, psql, the Azure portal's query editor).
 | `1-create-schema.sql` | Creates the tables on the target. Safe to run twice. |
 | `2-load-data.sql` | Loads all the data in one transaction (a failure changes nothing). Run it on an **empty** database. It ends with a table of row counts. |
 | `3-verify.sql` | Read only. Run on the source and the target: counts and key fingerprints must match. |
+| `4-add-audit-log.sql` | Adds the audit log table to a database created before it existed. New databases already have it. |
+| `5-prevent-double-booking.sql` | Adds the two unique indexes that stop two people booking the same desk, or one person booking two desks, at the same moment. New databases already have them. **Run this on any database created before the indexes existed, or double bookings are possible.** It refuses, changing nothing, if double bookings already exist. |
 
 `2-load-data.sql` is generated from Supabase, so it holds a snapshot of the data at that moment and real data (names, emails,
 photos, about 800 KB for the test project). It is ignored by git: keep it private and delete it when you are done. To make a fresh

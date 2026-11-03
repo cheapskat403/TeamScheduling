@@ -8,6 +8,18 @@ const { todayInOffice } = require('../utils/dates');
 const { validateBody } = require('../utils/validate');
 const crypto = require('crypto');
 
+/**
+ * The answer for a booking the database refused as a duplicate (error code 23505). Two requests can both
+ * pass the "is it free?" checks below, so the unique indexes (see scripts/postgres/5-prevent-double-booking.sql)
+ * are what really stop a double booking, and this says which rule was hit.
+ */
+function duplicateBookingMessage(error) {
+    const rule = `${error.constraint || ''} ${error.message || ''}`;
+    return /person_date/.test(rule)
+        ? 'You already have a desk booked for that day.'
+        : 'That desk was just taken. Pick another one.';
+}
+
 /** Identity of the caller: the verified Azure AD user when signed in, otherwise null */
 function callerEmail(req) {
     return req.user && req.user.authenticated && req.user.email ? req.user.email.toLowerCase() : null;
@@ -130,7 +142,7 @@ router.post('/', validateBody('deskBooking'), async (req, res) => {
         if (error) {
             // Unique index hit: someone else won the race for this desk / this person already booked
             if (error.code === '23505') {
-                return res.status(409).json({ error: 'That desk was just taken. Pick another one.' });
+                return res.status(409).json({ error: duplicateBookingMessage(error) });
             }
             throw error;
         }
@@ -304,6 +316,7 @@ router.checkinInfo = checkinInfo;
 
 /** Called once by server.js with a function (locationId, payload) that reaches the Desks page of that location */
 router.initLive = (notify) => { notifyDesks = notify; };
+router.duplicateBookingMessage = duplicateBookingMessage;
 
 module.exports = router;
 
