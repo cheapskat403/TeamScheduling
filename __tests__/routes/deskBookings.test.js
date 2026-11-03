@@ -462,3 +462,75 @@ describe('Booking rules', () => {
             .expect(403);
     });
 });
+
+describe('Live updates to the Desks page', () => {
+    const mkApp = (user) => {
+        const a = express();
+        a.use(express.json());
+        a.use((req, res, next) => { if (user) req.user = user; next(); });
+        a.use('/api/desk-bookings', deskBookingsRouter);
+        return a;
+    };
+    const signedIn = { authenticated: true, email: 'jane@example.com', name: 'Jane Doe' };
+    let notify;
+
+    beforeEach(() => {
+        resetMockData();
+        mockData.desks = [{ id: 'd1', name: 'Desk 1', location_id: 'loc1', qr_code: 'QR1' }];
+        mockData.desk_bookings = [];
+        notify = jest.fn();
+        deskBookingsRouter.initLive(notify);
+    });
+    afterEach(() => deskBookingsRouter.initLive(null));
+
+    test('a new desk booking is announced for its location and day', async () => {
+        await request(mkApp()).post('/api/desk-bookings').send({ deskId: 'd1', date: FUTURE, employeeName: 'John' }).expect(201);
+        expect(notify).toHaveBeenCalledTimes(1);
+        expect(notify).toHaveBeenCalledWith('loc1', { type: 'deskBooking:created', date: FUTURE });
+    });
+
+    test('the announcement says nothing about who booked, only what changed and when', async () => {
+        await request(mkApp()).post('/api/desk-bookings').send({ deskId: 'd1', date: FUTURE, employeeName: 'John', employeeEmail: 'john@example.com' }).expect(201);
+        expect(JSON.stringify(notify.mock.calls)).not.toMatch(/John|john@example|d1|QR1/);
+    });
+
+    test('a cancellation is announced for the cancelled booking\'s location and day', async () => {
+        mockData.desk_bookings = [{ id: 'b1', desk_id: 'd1', location_id: 'loc1', date: FUTURE, employee_email: 'jane@example.com' }];
+        await request(mkApp(signedIn)).delete('/api/desk-bookings/b1').expect(200);
+        expect(notify).toHaveBeenCalledWith('loc1', { type: 'deskBooking:cancelled', date: FUTURE });
+    });
+
+    test('a check-in is announced', async () => {
+        const today = todayInOffice();
+        mockData.desk_bookings = [{ id: 'b1', desk_id: 'd1', location_id: 'loc1', date: today, employee_email: '', checked_in: false }];
+        await request(mkApp()).post('/api/desk-bookings/b1/checkin').send({ qrCode: 'QR1' }).expect(200);
+        expect(notify).toHaveBeenCalledWith('loc1', { type: 'deskBooking:checkedIn', date: today });
+    });
+
+    test('nothing is announced when the change did not happen', async () => {
+        // Refused: someone else's booking
+        mockData.desk_bookings = [{ id: 'b1', desk_id: 'd1', location_id: 'loc1', date: FUTURE, employee_email: 'bob@example.com' }];
+        await request(mkApp(signedIn)).delete('/api/desk-bookings/b1').expect(403);
+        // Refused: desk already taken
+        await request(mkApp()).post('/api/desk-bookings').send({ deskId: 'd1', date: FUTURE, employeeName: 'John' }).expect(400);
+        // Refused: bad QR code
+        await request(mkApp()).post('/api/desk-bookings/b1/checkin').send({ qrCode: 'WRONG' }).expect(400);
+        expect(notify).not.toHaveBeenCalled();
+    });
+
+    test('cancelling something that does not exist announces nothing', async () => {
+        await request(mkApp()).delete('/api/desk-bookings/ghost').expect(200);
+        expect(notify).not.toHaveBeenCalled();
+    });
+
+    test('a failing announcement never breaks the booking', async () => {
+        notify.mockImplementation(() => { throw new Error('socket down'); });
+        await request(mkApp()).post('/api/desk-bookings').send({ deskId: 'd1', date: FUTURE, employeeName: 'John' }).expect(201);
+        expect(mockData.desk_bookings).toHaveLength(1);
+    });
+
+    test('everything works when live updates were never set up', async () => {
+        deskBookingsRouter.initLive(null);
+        await request(mkApp()).post('/api/desk-bookings').send({ deskId: 'd1', date: FUTURE, employeeName: 'John' }).expect(201);
+    });
+});

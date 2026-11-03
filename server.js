@@ -20,7 +20,7 @@ const { Server } = require('socket.io');
 
 // Import modules
 const { supabase } = require('./config/supabase');
-const { initializeSocketHandlers, roomKeyForBooking, emitRoomDataChanged } = require('./socket/presence');
+const { initializeSocketHandlers, roomKeyForBooking, roomKeyForDesks, emitRoomDataChanged } = require('./socket/presence');
 const logger = require('./utils/logger');
 
 // Import routes
@@ -69,9 +69,17 @@ initializeSocketHandlers(io);
 
 // Initialize routes that need Socket.IO
 initBookingsRoutes({
-    emitRoomDataChanged: (roomKey, payload) => emitRoomDataChanged(io, roomKey, payload),
+    emitRoomDataChanged: (roomKey, payload) => {
+        emitRoomDataChanged(io, roomKey, payload);
+        // The Desks page lists which teams are booked in each day, so Calendar bookings change it too
+        const locations = new Set([payload.booking && payload.booking.locationId, payload.before && payload.before.locationId].filter(Boolean));
+        locations.forEach(locationId => emitRoomDataChanged(io, roomKeyForDesks(locationId), { type: 'teamBooking:changed' }));
+    },
     roomKeyForBooking
 });
+
+// Desk bookings made, cancelled or checked in reach everyone on the Desks page of that location
+deskBookingsRoutes.initLive((locationId, payload) => emitRoomDataChanged(io, roomKeyForDesks(locationId), payload));
 
 // ============================================
 // Middleware

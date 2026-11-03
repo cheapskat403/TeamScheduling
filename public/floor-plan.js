@@ -1224,6 +1224,19 @@ function showDeskToast(message, actionLabel, onAction) {
     setTimeout(close, 7000);
 }
 
+// Other people's desk, and Calendar team, bookings arrive over the socket (the desks room, see js/socket.js)
+let liveTimer = null;
+function liveBookingsChanged(payload) {
+    if (!document.getElementById('desksView')?.classList.contains('active')) return;
+    // Only the week on screen matters
+    if (payload && payload.date && deskState.rangeFrom && (payload.date < deskState.rangeFrom || payload.date > deskState.rangeTo)) return;
+    // Do not redraw the map under someone who is editing the layout: leaving edit mode reloads everything anyway
+    if (deskState.editMode) return;
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(() => refreshBookings().catch(error => console.warn('Live refresh failed:', error)), 200);
+}
+window.deskLive = { changed: liveBookingsChanged };
+
 async function refreshBookings() {
     const from = deskState.rangeFrom || mondayOf(deskState.selectedDate);
     const to = deskState.rangeTo || addDays(from, 6);

@@ -13,6 +13,7 @@ let viewersJustRemoved = false; // Track if viewers were just removed for revers
 // The Desks page has its own presence room (desks:<location>). While it is open the connection is in that
 // room instead of the calendar's month room, and goes back to the calendar room when the page is left.
 let desksActive = false;
+let hasConnectedBefore = false;
 let deskMode = { mode: 'viewing', floor: null };   // what we are doing there: viewing, or editing the layout
 
 /**
@@ -96,6 +97,9 @@ export function initSocket() {
 
         socket.on('connect', () => {
             authRetries = 0;
+            // After a dropped connection, changes may have been missed: have the Desks page look again
+            if (hasConnectedBefore && desksActive) window.deskLive?.changed({});
+            hasConnectedBefore = true;
             console.log('Socket connected for user:', userName);
             state.currentRoom = null;   // a new connection is in no room yet, even if the page thinks it is
             joinCurrentRoom();
@@ -124,6 +128,11 @@ export function initSocket() {
         });
 
         socket.on('data:changed', (payload) => {
+            // The Desks page has its own room and its own way of refreshing
+            if (payload && typeof payload.roomKey === 'string' && payload.roomKey.startsWith('desks:')) {
+                window.deskLive?.changed(payload);
+                return;
+            }
             handleDataChange(payload);
         });
     }

@@ -16,6 +16,14 @@ function callerEmail(req) {
 // Protect write operations
 router.use(requireAuthForWrites);
 
+// Tells everyone looking at the Desks page of a location that its bookings changed (set up in server.js).
+// It only says WHAT kind of change and for which day; the pages fetch the new bookings themselves.
+let notifyDesks = null;
+function liveChanged(locationId, payload) {
+    if (!notifyDesks || !locationId) return;
+    try { notifyDesks(locationId, payload); } catch (error) { logger.warn('Could not send live desk update:', error.message); }
+}
+
 /**
  * Get desk bookings for a date/location
  */
@@ -127,6 +135,7 @@ router.post('/', validateBody('deskBooking'), async (req, res) => {
             throw error;
         }
         res.status(201).json(toCamelCase(data));
+        liveChanged(data.location_id, { type: 'deskBooking:created', date: data.date });
     } catch (error) {
         logger.error('Error creating desk booking:', error);
         res.status(500).json({ error: 'Failed to create desk booking' });
@@ -140,14 +149,15 @@ router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
+        const { data: existing } = await supabase
+            .from('desk_bookings')
+            .select('employee_email, location_id, date')
+            .eq('id', id)
+            .single();
+
         // Signed-in users can only cancel their own bookings (admins can cancel anyone's)
         const email = callerEmail(req);
         if (email && !(req.permissions && req.permissions.isAdmin)) {
-            const { data: existing } = await supabase
-                .from('desk_bookings')
-                .select('employee_email')
-                .eq('id', id)
-                .single();
             if (existing && (existing.employee_email || '').toLowerCase() !== email) {
                 return res.status(403).json({ error: 'You can only cancel your own bookings' });
             }
@@ -157,9 +167,10 @@ router.delete('/:id', async (req, res) => {
             .from('desk_bookings')
             .delete()
             .eq('id', id);
-        
+
         if (error) throw error;
         res.json({ success: true });
+        if (existing) liveChanged(existing.location_id, { type: 'deskBooking:cancelled', date: existing.date });
     } catch (error) {
         logger.error('Error canceling desk booking:', error);
         res.status(500).json({ error: 'Failed to cancel desk booking' });
@@ -230,6 +241,7 @@ router.post('/:id/checkin', async (req, res) => {
         if (updateError) throw updateError;
         
         res.json({ success: true, booking: toCamelCase(updated) });
+        liveChanged(booking.location_id, { type: 'deskBooking:checkedIn', date: booking.date });
     } catch (error) {
         logger.error('Error checking in:', error);
         res.status(500).json({ error: 'Failed to check in' });
@@ -289,6 +301,9 @@ async function checkinInfo(req, res) {
 
 router.get('/checkin/:qrCode', checkinInfo);
 router.checkinInfo = checkinInfo;
+
+/** Called once by server.js with a function (locationId, payload) that reaches the Desks page of that location */
+router.initLive = (notify) => { notifyDesks = notify; };
 
 module.exports = router;
 
