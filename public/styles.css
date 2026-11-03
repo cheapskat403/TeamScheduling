@@ -5940,3 +5940,12 @@ body:not(.can-calendar) .calendar-edit { display: none !important; }
 .switch input:checked + .switch-track::after { transform: translateX(18px); background: #fff; }
 .switch input:focus-visible + .switch-track { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
 .switch input:disabled + .switch-track { opacity: 0.55; }
+
+.audit-label { font-weight: 600; color: var(--text-primary); }
+.audit-note { margin: 0.4rem 0 0.2rem; font-size: 0.75rem; color: var(--danger); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+.audit-fields { margin: 0.4rem 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 0.2rem 0.8rem; font-size: 0.8rem; max-width: 30rem; }
+.audit-fields dt { color: var(--text-muted); text-transform: capitalize; }
+.audit-fields dd { margin: 0; word-break: break-word; }
+.audit-old { color: var(--danger); text-decoration: line-through; }
+.audit-new { color: var(--success); }
+.audit-note-new { color: var(--success); }

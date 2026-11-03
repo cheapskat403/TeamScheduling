@@ -41,16 +41,41 @@ function whenText(iso) {
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+const fieldName = (key) => key.replace(/_/g, ' ');
+const valueText = (value) => {
+    if (value === null || value === undefined || value === '') return '(empty)';
+    return typeof value === 'object' ? JSON.stringify(value) : String(value);
+};
+
 function detailsHtml(details) {
     if (!details || (typeof details === 'object' && Object.keys(details).length === 0)) return '';
-    return `<details class="audit-details"><summary>View</summary><pre>${escapeHtml(JSON.stringify(details, null, 2))}</pre></details>`;
+
+    let body;
+    if (details.deleted || details.created) {
+        // What a delete removed, or what a create made
+        const fields = details.deleted || details.created;
+        body = `<p class="audit-note${details.created ? ' audit-note-new' : ''}">${details.created ? 'New record' : 'Deleted record'}</p><dl class="audit-fields">` + Object.entries(fields)
+            .map(([k, v]) => `<dt>${escapeHtml(fieldName(k))}</dt><dd>${escapeHtml(valueText(v))}</dd>`).join('') + '</dl>';
+    } else if (details.changed) {
+        // What an update changed: old value, then new value
+        body = '<dl class="audit-fields">' + Object.entries(details.changed)
+            .map(([k, c]) => `<dt>${escapeHtml(fieldName(k))}</dt><dd><span class="audit-old">${escapeHtml(valueText(c.from))}</span> &rarr; <span class="audit-new">${escapeHtml(valueText(c.to))}</span></dd>`).join('') + '</dl>';
+    } else {
+        const { label, ...rest } = details;
+        if (Object.keys(rest).length === 0) return '';
+        body = `<pre>${escapeHtml(JSON.stringify(rest.request || rest, null, 2))}</pre>`;
+    }
+    return `<details class="audit-details"><summary>View</summary>${body}</details>`;
 }
 
 function rowHtml(entry) {
     const who = entry.actorName || entry.actorEmail || 'Not signed in';
     const email = entry.actorName && entry.actorEmail ? `<small>${escapeHtml(entry.actorEmail)}</small>` : '';
     const area = AREAS[entry.entity] || entry.entity || '';
-    const target = entry.entityId ? ` <small class="audit-id">${escapeHtml(entry.entityId)}</small>` : '';
+    const label = entry.details && typeof entry.details.label === 'string' ? entry.details.label : '';
+    const target = label
+        ? `<br><span class="audit-label">${escapeHtml(label)}</span>`
+        : entry.entityId ? ` <small class="audit-id">${escapeHtml(entry.entityId)}</small>` : '';
     const outcome = entry.outcome in OUTCOMES ? entry.outcome : 'failed';
     return `<tr>
         <td class="audit-when">${escapeHtml(whenText(entry.at))}</td>

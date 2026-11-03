@@ -38,9 +38,18 @@ Roles are only enforced when `REQUIRE_AUTH=true` (without logins there is nobody
 
 ## Audit log
 
-Every change made through the API is recorded: who, what (area and id), when, the result, and the request cut down for
-storage. Refused attempts are recorded too, as "Not allowed". It is written after the response, so it never slows or breaks a
+Every change made through the API is recorded: who, what (area and a readable name such as "Absa CIB on 2026-11-05"),
+when, the result, and the details of the change:
+
+- **Created:** the new record's key fields.
+- **Changed:** each field that changed, old value then new value.
+- **Deleted:** the key fields of the record that was removed, so you can tell exactly what is gone.
+- **Check-in:** which booking.
+
+The record is looked up just before an update or delete, and read back after a create, to get this. Refused attempts are recorded too, as "Not allowed". It is written after the response, so it never slows or breaks a
 request; if writing fails the error is only logged. Photos, QR codes, tokens and similar fields are never stored, long text is
 shortened and each entry is size-capped. Reads (viewing pages) are not recorded. Nothing is deleted automatically.
 
-The server does not record the previous value of a changed item, only the request that changed it.
+Only a short list of fields per kind of record is kept (for example a team's name, manager, member count, location and
+colour), never photos or QR codes. A record that cannot be looked up (for example one that was already gone) is still logged,
+just without those details.

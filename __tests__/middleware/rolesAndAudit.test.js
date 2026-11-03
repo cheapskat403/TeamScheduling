@@ -6,11 +6,11 @@
 const request = require('supertest');
 const express = require('express');
 
-const mockDb = { settings: [], audit_log: [] };
+const mockDb = { settings: [], audit_log: [], teams: [], bookings: [], desk_bookings: [], public_holidays: [], desks: [], locations: [], floor_elements: [] };
 
 jest.mock('../../config/supabase', () => {
     function builder(table) {
-        const state = { filters: [], order: null, limit: null, insert: null };
+        const state = { filters: [], order: null, limit: null, insert: null, maybeSingle: false };
         const b = {
             select() { return b; },
             in(col, values) { state.filters.push(r => values.includes(r[col])); return b; },
@@ -20,6 +20,7 @@ jest.mock('../../config/supabase', () => {
             order(col, { ascending = true } = {}) { state.order = { col, ascending }; return b; },
             limit(n) { state.limit = n; return b; },
             insert(row) { state.insert = row; return b; },
+            maybeSingle() { state.maybeSingle = true; return b; },
             then(resolve, reject) {
                 try {
                     if (state.insert) {
@@ -29,6 +30,7 @@ jest.mock('../../config/supabase', () => {
                     let rows = mockDb[table].filter(r => state.filters.every(f => f(r)));
                     if (state.order) rows = [...rows].sort((a, c) => (a[state.order.col] < c[state.order.col] ? -1 : 1) * (state.order.ascending ? 1 : -1));
                     if (state.limit) rows = rows.slice(0, state.limit);
+                    if (state.maybeSingle) return Promise.resolve({ data: rows[0] || null, error: null }).then(resolve, reject);
                     return Promise.resolve({ data: rows, error: null }).then(resolve, reject);
                 } catch (e) { return Promise.reject(e).then(resolve, reject); }
             }
@@ -249,6 +251,93 @@ describe('roles and audit log (REQUIRE_AUTH=true)', () => {
             await flush();
             expect(res.status).toBe(201);
             mockDb.audit_log = original;
+        });
+    });
+
+    describe('audit log: detail', () => {
+        const last = () => mockDb.audit_log[mockDb.audit_log.length - 1];
+        const owner = { 'X-User': ADMIN };
+
+        test('a delete records what was deleted', async () => {
+            mockDb.teams = [{ id: 'absa-cib', name: 'Absa CIB', manager: 'Francois', member_count: 8, color: '#b91c1c', location_id: 'jhb', manager_image: 'data:image/png;base64,AAAA', created_at: '2025-01-01' }];
+            await request(app).delete('/api/teams/absa-cib').set(owner);
+            await flush();
+            expect(last()).toMatchObject({ action: 'delete', entity: 'teams', entity_id: 'absa-cib', outcome: 'success' });
+            expect(last().details).toEqual({
+                label: 'Absa CIB',
+                deleted: { name: 'Absa CIB', manager: 'Francois', member_count: 8, location_id: 'jhb', color: '#b91c1c' }
+            });
+        });
+
+        test('a create is named once it exists, with its key fields', async () => {
+            mockDb.teams = [{ id: 'new-1', name: 'Platform', manager: 'Sam', member_count: 4, location_id: 'jhb', color: '#112233', manager_image: 'data:image/png;base64,AAAA' }];
+            await request(app).post('/api/teams').set(owner).send({ name: 'Platform' });
+            await flush();
+            expect(last()).toMatchObject({ action: 'create', entity_id: 'new-1' });
+            expect(last().details).toEqual({
+                label: 'Platform',
+                created: { name: 'Platform', manager: 'Sam', member_count: 4, location_id: 'jhb', color: '#112233' }
+            });
+        });
+
+        test('each area gets a readable label', async () => {
+            mockDb.bookings = [{ id: 'b1', date: '2026-11-05', team_name: 'Liberty', people_count: 4, location_id: 'jhb', notes: '' }];
+            mockDb.desk_bookings = [{ id: 'd1', date: '2026-11-06', desk_name: 'SM01', employee_name: 'Jane Doe', employee_email: 'jane@example.com', checked_in: false }];
+            mockDb.public_holidays = [{ id: 7, date: '2026-12-25', name: 'Christmas Day' }];
+            await request(app).delete('/api/bookings/b1').set(owner);
+            await request(app).delete('/api/desk-bookings/d1').set(owner);
+            await request(app).delete('/api/holidays/2026-12-25').set(owner);
+            await flush();
+            expect(mockDb.audit_log.map(r => r.details.label)).toEqual(['Liberty on 2026-11-05', 'SM01 on 2026-11-06 (Jane Doe)', 'Christmas Day (2026-12-25)']);
+        });
+
+        test('an update records old and new values for what changed, and ignores what did not', async () => {
+            mockDb.teams = [{ id: 't1', name: 'Platform', member_count: 5, color: '#000000', location_id: 'jhb' }];
+            await request(app).put('/api/teams/t1').set(owner).send({ name: 'Platform', memberCount: 9, color: '#ffffff' });
+            await flush();
+            expect(last().details).toEqual({
+                label: 'Platform',
+                changed: { member_count: { from: 5, to: 9 }, color: { from: '#000000', to: '#ffffff' } }
+            });
+        });
+
+        test('an update that changes nothing falls back to the request', async () => {
+            mockDb.teams = [{ id: 't1', name: 'Platform', member_count: 5 }];
+            await request(app).put('/api/teams/t1').set(owner).send({ name: 'Platform' });
+            await flush();
+            expect(last().details).toEqual({ label: 'Platform', request: { name: 'Platform' } });
+        });
+
+        test('a check-in is labelled with the booking', async () => {
+            mockDb.desk_bookings = [{ id: 'd2', date: '2026-11-06', desk_name: 'SM02', employee_name: 'Sam' }];
+            await request(app).post('/api/desk-bookings/d2/checkin').set(who(STAFF)).send({ qrCode: 'secret-qr' });
+            await flush();
+            expect(last().details).toEqual({ label: 'SM02 on 2026-11-06 (Sam)' });
+        });
+
+        test('a refused delete still says what the person tried to delete', async () => {
+            mockDb.teams = [{ id: 't9', name: 'Protected' }];
+            await request(app).delete('/api/teams/t9').set(who(STAFF));
+            await flush();
+            expect(last()).toMatchObject({ outcome: 'denied', status: 403 });
+            expect(last().details.label).toBe('Protected');
+        });
+
+        test('a record that no longer exists, or cannot be looked up, does not stop the entry being written', async () => {
+            await request(app).delete('/api/teams/ghost').set(owner);
+            mockDb.teams = null;     // makes the lookup throw
+            await request(app).delete('/api/teams/t1').set(owner);
+            await flush();
+            expect(mockDb.audit_log).toHaveLength(2);
+            expect(mockDb.audit_log.every(r => r.outcome === 'success')).toBe(true);
+            mockDb.teams = [];
+        });
+
+        test('photos and QR codes never appear in what is kept', async () => {
+            mockDb.desks = [{ id: 'k1', name: 'Desk 1', qr_code: 'qr-secret', floor: '1', desk_type: 'hotseat' }];
+            await request(app).delete('/api/desks/k1').set(owner);
+            await flush();
+            expect(JSON.stringify(last().details)).not.toContain('qr-secret');
         });
     });
 
