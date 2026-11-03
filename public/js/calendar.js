@@ -7,6 +7,7 @@ import { state, elements } from './state.js';
 import { formatDateStr, getBookingPeopleCount, getInitials, getAvatarHTML, escapeHtml, safeColor, safeImageSrc } from './utils.js';
 import { loadBookingsForMonth } from './api.js';
 import { joinCurrentRoom } from './socket.js';
+import { canBookCalendar } from './permissions.js';
 
 // Navigation state to prevent rapid clicking
 let isNavigating = false;
@@ -120,7 +121,7 @@ function renderCalendarGrid(year, month, monthBookings, capacity, today, isLoadi
                 dayContent += `
                     <div class="booking-chip ${isOverbooked ? 'overbooked' : ''} ${isLoadingBooking ? 'loading' : ''}" 
                          style="background: ${safeColor(color, '#6B7280')}" 
-                         draggable="${!isLoadingBooking}"
+                         draggable="${!isLoadingBooking && canBookCalendar()}"
                          ondragstart="handleDragStart(event, '${escapeHtml(booking.id)}')"
                          ondragend="handleDragEnd(event)"
                          onmouseenter="showTeamTooltip(event, '${escapeHtml(booking.teamId)}')"
@@ -142,7 +143,7 @@ function renderCalendarGrid(year, month, monthBookings, capacity, today, isLoadi
             dayContent += '<div class="booking-loading-skeleton"></div>';
         }
         
-        const dropHandlers = !isWeekend && !holiday ? 
+        const dropHandlers = !isWeekend && !holiday && canBookCalendar() ? 
             `ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${dateStr}')"` : '';
         
         html += `<div class="${classes.join(' ')}" onclick="openBookingModal('${dateStr}')" ${dropHandlers}>${dayContent}</div>`;

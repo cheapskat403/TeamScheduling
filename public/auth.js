@@ -209,6 +209,20 @@ async function getIdTokenQuietly() {
     }
 }
 
+/**
+ * A Microsoft Graph access token, silently. The server uses it once (on /api/me) to ask Graph for our
+ * job title, which decides what we may do. Resolves with null when there is none.
+ */
+async function getGraphTokenQuietly() {
+    if (!msalInstance || !currentAccount) return null;
+    try {
+        const response = await msalInstance.acquireTokenSilent({ scopes: ['User.Read'], account: currentAccount });
+        return response.accessToken || null;
+    } catch (error) {
+        return null;
+    }
+}
+
 async function getIdToken() {
     if (!msalInstance) {
         console.error('getIdToken: MSAL instance not initialized');
@@ -579,6 +593,7 @@ window.getCurrentUser = getCurrentUser;
 window.getAccessToken = getAccessToken;
 window.getIdToken = getIdToken;
 window.getIdTokenQuietly = getIdTokenQuietly;
+window.getGraphTokenQuietly = getGraphTokenQuietly;
 
 // ============================================
 // Send the signed-in user's token with every API call
@@ -611,7 +626,19 @@ window.getIdTokenQuietly = getIdTokenQuietly;
             if (token) headers.set('Authorization', 'Bearer ' + token);
         }
 
-        const response = await nativeFetch(input, Object.assign({}, init, { headers }));
+        let response = await nativeFetch(input, Object.assign({}, init, { headers }));
+
+        // The server has not verified our job title yet (it forgets after a while or on restart): send it
+        // our Graph token via /api/me, then try this request once more
+        if (response.status === 403 && typeof window.refreshPermissions === 'function') {
+            try {
+                const body = await response.clone().json();
+                if (body && body.code === 'IDENTITY_UNVERIFIED') {
+                    await window.refreshPermissions();
+                    response = await nativeFetch(input, Object.assign({}, init, { headers }));
+                }
+            } catch (error) { /* not our JSON error: leave it alone */ }
+        }
 
         // The session is gone (for example the refresh token expired): send the user back to sign in
         if (response.status === 401 && !signInPrompted) {

@@ -250,9 +250,14 @@
                     </svg>
                     Desks
                 </button>
-                
-                <!-- Settings Menu with Submenu -->
-                <div class="nav-item-group">
+
+                <button class="nav-item audit-only" data-view="audit">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                    Audit log
+                </button>
+
+                <!-- Settings Menu with Submenu (admins only) -->
+                <div class="nav-item-group admin-only">
                     <button class="nav-item has-submenu" id="settingsToggle">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="3"></circle>
@@ -298,6 +303,10 @@
                                 <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"></path>
                             </svg>
                             Holidays
+                        </button>
+                        <button class="nav-item nav-subitem" data-view="access">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            Access
                         </button>
                     </div>
                 </div>
@@ -432,7 +441,7 @@
                         <select id="floorSelect" class="floor-select" aria-label="Floor">
                             <option value="1">1st Floor</option>
                         </select>
-                        <button id="toggleEditMode" class="btn btn-secondary">
+                        <button id="toggleEditMode" class="btn btn-secondary admin-only">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -577,7 +586,7 @@
                         Refresh from Azure AD
                     </button>
                 </header>
-                <p class="view-description">Select which job titles from Azure AD are allowed to lead teams. When creating a team, only people with these job titles will appear in the manager dropdown.</p>
+                <p class="view-description">Select which job titles from Azure AD are allowed to lead teams. When creating a team, only people with these job titles will appear in the manager dropdown. <strong>People with these job titles can also make Calendar bookings</strong> (admins always can); everyone can book desks.</p>
                 
                 <div class="team-roles-container">
                     <div class="roles-section">
@@ -597,6 +606,71 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Audit Log View -->
+            <div id="auditView" class="view">
+                <header class="view-header">
+                    <h1>Audit log</h1>
+                </header>
+                <p class="view-description">Every change made in the app, and every attempt that was refused: who did it, what and when.</p>
+                <div class="audit-filters">
+                    <label>Person <input id="auditActor" type="text" placeholder="name@company.com" maxlength="200"></label>
+                    <label>Area <select id="auditEntity"></select></label>
+                    <label>Result
+                        <select id="auditOutcome">
+                            <option value="">All</option>
+                            <option value="success">Done</option>
+                            <option value="denied">Not allowed</option>
+                            <option value="failed">Failed</option>
+                        </select>
+                    </label>
+                    <label>From <input id="auditFrom" type="date"></label>
+                    <label>To <input id="auditTo" type="date"></label>
+                    <button id="auditApply" class="btn btn-primary" type="button">Apply</button>
+                    <button id="auditClear" class="btn btn-secondary" type="button">Clear</button>
+                </div>
+                <div class="audit-table-wrap">
+                    <table class="audit-table">
+                        <thead><tr><th>When</th><th>Who</th><th>Action</th><th>What</th><th>Result</th><th>Details</th></tr></thead>
+                        <tbody id="auditRows"></tbody>
+                    </table>
+                </div>
+                <button id="auditMore" class="btn btn-secondary" type="button" style="display:none">Load more</button>
+            </div>
+
+            <!-- Access View (admins) -->
+            <div id="accessView" class="view">
+                <header class="view-header">
+                    <h1>Access</h1>
+                </header>
+                <p class="view-description">Admins can change everything: teams, locations, holidays, the desk layout, settings and any booking. Everyone signed in can book desks.</p>
+                <div class="team-roles-container">
+                    <div class="roles-section">
+                        <h3>Admins</h3>
+                        <p class="section-hint">Admins set on the server (the ADMIN_EMAILS setting) always apply and are not shown here.</p>
+                        <div class="access-add">
+                            <input id="adminEmail" type="email" placeholder="name@company.com" maxlength="200" aria-label="Admin email">
+                            <button id="adminAdd" class="btn btn-primary" type="button">Add admin</button>
+                        </div>
+                        <div id="adminList" class="allowed-roles-list"></div>
+                    </div>
+                    <div class="roles-section">
+                        <h3>Can read the audit log</h3>
+                        <p class="section-hint">Admins always can. Add Azure AD job titles to let those people read it too.</p>
+                        <div class="access-add">
+                            <input id="auditRoleInput" list="auditRoleChoices" placeholder="Job title" maxlength="100" aria-label="Job title">
+                            <datalist id="auditRoleChoices"></datalist>
+                            <button id="auditRoleAdd" class="btn btn-primary" type="button">Add</button>
+                        </div>
+                        <div id="auditRoleList" class="allowed-roles-list"></div>
+                    </div>
+                    <div class="roles-section">
+                        <h3>Can make Calendar bookings</h3>
+                        <p class="section-hint">These are the Team Lead Roles (Settings, Team Roles). Admins always can.</p>
+                        <div id="calendarRoleList" class="allowed-roles-list"></div>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -612,6 +686,7 @@
                     </svg>
                 </button>
             </div>
+            <p class="calendar-readonly-note">Only team managers and admins can make Calendar bookings. You can still book a desk on the Desks page.</p>
             <form id="bookingForm" novalidate>
                 <input type="hidden" id="bookingId">
                 <input type="hidden" id="bookingDate">

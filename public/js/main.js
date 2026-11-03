@@ -41,6 +41,7 @@ import {
     closeManagerDropdown, selectManager 
 } from './azure-managers.js';
 import { formatDateStr, showToast } from './utils.js';
+import { loadPermissions } from './permissions.js';
 
 /**
  * Initialize the application
@@ -54,7 +55,11 @@ async function initApp() {
     
     // Load theme
     loadTheme();
-    
+
+    // Find out what this user may do, so controls they cannot use are hidden from the start
+    await loadPermissions();
+    document.addEventListener('permissions-changed', () => window.renderCalendar?.());
+
     // Load initial data
     await loadData();
     await loadBookingsForMonth();

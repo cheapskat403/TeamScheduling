@@ -5965,3 +5965,63 @@ form {
     text-transform: uppercase;
     color: var(--text-muted);
 }
+
+/* ============================================
+   Roles: what the signed-in user may see
+   js/permissions.js sets is-admin, can-calendar and can-audit on <body>. The server enforces all of it;
+   this only hides controls that would be refused anyway.
+   ============================================ */
+body:not(.is-admin) .admin-only { display: none !important; }
+body:not(.can-audit) .audit-only { display: none !important; }
+
+.calendar-readonly-note {
+    display: none;
+    margin: var(--spacing-md) var(--spacing-lg) 0;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+body:not(.can-calendar) .calendar-readonly-note { display: block; }
+body:not(.can-calendar) #bookingForm,
+body:not(.can-calendar) .calendar-edit { display: none !important; }
+
+/* Access page */
+.access-add { display: flex; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm); flex-wrap: wrap; }
+.access-add input {
+    flex: 1 1 14rem;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* Audit log page */
+.audit-filters { display: flex; flex-wrap: wrap; gap: var(--spacing-md); align-items: flex-end; margin-bottom: var(--spacing-md); }
+.audit-filters label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: var(--text-secondary); }
+.audit-filters input, .audit-filters select {
+    padding: 0.45rem 0.6rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font: inherit;
+}
+.audit-table-wrap { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: var(--spacing-md); }
+.audit-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.audit-table th, .audit-table td { text-align: left; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+.audit-table th { color: var(--text-secondary); font-weight: 600; background: var(--bg-secondary); white-space: nowrap; }
+.audit-table tr:last-child td { border-bottom: 0; }
+.audit-table small { color: var(--text-muted); }
+.audit-when { white-space: nowrap; }
+.audit-id { word-break: break-all; }
+.audit-badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+.audit-success { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+.audit-denied { background: rgba(245, 166, 35, 0.15); color: var(--warning); }
+.audit-failed { background: rgba(229, 57, 53, 0.15); color: var(--danger); }
+.audit-details summary { cursor: pointer; color: var(--accent-primary); }
+.audit-details pre { margin: 0.4rem 0 0; max-width: 28rem; overflow: auto; font-size: 0.75rem; white-space: pre-wrap; word-break: break-word; }
