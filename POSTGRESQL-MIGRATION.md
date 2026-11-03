@@ -32,34 +32,26 @@ To go back, set `DB_PROVIDER=supabase`. Anything written to the new database aft
 
 `node scripts/migrate-supabase-to-postgres.js --schema-only` just creates the empty tables.
 
-## Doing it by hand: the scripts in scripts/postgres/
+## Doing it by hand: the SQL scripts in scripts/postgres/
 
-Plain PostgreSQL scripts you run yourself, from any machine that can reach the databases (psql and pg_dump are needed;
-they come with a normal PostgreSQL install).
+Three plain SQL files. Run them in order in any PostgreSQL query tool that can reach the target (pgAdmin, Azure Data Studio,
+DBeaver, psql, the Azure portal's query editor).
 
 | Script | What it does |
 | --- | --- |
 | `1-create-schema.sql` | Creates the tables on the target. Safe to run twice. |
-| `2-copy-data.ps1` | Dumps the data from the source with pg_dump (read only) and loads it into the **empty** target in one transaction, then fixes the holiday id sequence. |
-| `3-verify.sql` | Run on both databases. Row counts and a key fingerprint per table must be identical. |
+| `2-load-data.sql` | Loads all the data in one transaction (a failure changes nothing). Run it on an **empty** database. It ends with a table of row counts. |
+| `3-verify.sql` | Read only. Run on the source and the target: counts and key fingerprints must match. |
+
+`2-load-data.sql` is generated from Supabase, so it holds a snapshot of the data at that moment and real data (names, emails,
+photos, about 800 KB for the test project). It is ignored by git: keep it private and delete it when you are done. To make a fresh
+one (this only reads from Supabase and needs SUPABASE_URL and SUPABASE_SECRET_KEY in the environment):
 
 ```
-psql "$TARGET_DB_URL" -v ON_ERROR_STOP=1 -f scripts/postgres/1-create-schema.sql
-
-$env:SOURCE_DB_URL = Read-Host "Source (Supabase) connection string"
-$env:TARGET_DB_URL = Read-Host "Target (Azure) connection string"
-./scripts/postgres/2-copy-data.ps1
-
-psql $env:SOURCE_DB_URL -f scripts/postgres/3-verify.sql
-psql $env:TARGET_DB_URL -f scripts/postgres/3-verify.sql
+node scripts/migrate-supabase-to-postgres.js --export-sql=scripts/postgres/2-load-data.sql
 ```
 
-Connection strings look like `postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require`. For Supabase use Project Settings >
-Database > Connection string (direct or session pooler, not the transaction pooler).
-
-If the machine that can reach Azure cannot reach Supabase, run the Node tool somewhere that can reach Supabase to make a plain
-SQL file, `node scripts/migrate-supabase-to-postgres.js --export-sql=data.sql`, and run that file on the target after step 1
-(`psql "$TARGET_DB_URL" -v ON_ERROR_STOP=1 -f data.sql`). It holds real data: it is ignored by git, keep it private.
+Bookings made in the app after the snapshot are not in it, so make the snapshot just before switching, then switch the app over.
 
 ## Not covered by the switch
 

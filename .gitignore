@@ -9,3 +9,4 @@ backups/
 # Data exports (contain real data)
 data.sql
 *-export.sql
+scripts/postgres/2-load-data.sql
