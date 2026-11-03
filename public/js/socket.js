@@ -4,7 +4,7 @@
  */
 
 import { state } from './state.js';
-import { stringToColor, escapeHtml } from './utils.js';
+import { stringToColor, escapeHtml, safeColor, safeImageSrc } from './utils.js';
 
 let socket = null;
 let previousViewerIds = new Set(); // Track previous viewers for animation
@@ -236,10 +236,10 @@ export function renderViewers() {
             cls = ' bumped-right'; // Bump right when someone leaves
         }
         
-        if (v.photo) {
-            return `<div class="presence-avatar presence-avatar-photo${cls}" title="${escapeHtml(v.name)}" data-user-id="${escapeHtml(v.id)}"><img src="${escapeHtml(v.photo)}" alt="${escapeHtml(v.name)}" loading="lazy"></div>`;
+        if (safeImageSrc(v.photo)) {
+            return `<div class="presence-avatar presence-avatar-photo${cls}" title="${escapeHtml(v.name)}" data-user-id="${escapeHtml(v.id)}"><img src="${escapeHtml(safeImageSrc(v.photo))}" alt="${escapeHtml(v.name)}" loading="lazy"></div>`;
         }
-        return `<div class="presence-avatar${cls}" style="background: ${escapeHtml(v.color)}" title="${escapeHtml(v.name)}" data-user-id="${escapeHtml(v.id)}">${escapeHtml(v.name.charAt(0).toUpperCase())}</div>`;
+        return `<div class="presence-avatar${cls}" style="background: ${safeColor(v.color, '#6B7280')}" title="${escapeHtml(v.name)}" data-user-id="${escapeHtml(v.id)}">${escapeHtml(v.name.charAt(0).toUpperCase())}</div>`;
     }).join('');
     
     if (overflow > 0) {
@@ -269,9 +269,9 @@ export function renderViewers() {
             } else if (hasRemovedViewers) {
                 cls = ' bumped-down'; // Bump down when someone leaves
             }
-            const avatar = v.photo 
-                ? `<div class="presence-avatar presence-avatar-photo${cls}"><img src="${escapeHtml(v.photo)}" alt="${escapeHtml(v.name)}" loading="lazy"></div>`
-                : `<div class="presence-avatar${cls}" style="background: ${escapeHtml(v.color)}">${escapeHtml(v.name.charAt(0).toUpperCase())}</div>`;
+            const avatar = safeImageSrc(v.photo) 
+                ? `<div class="presence-avatar presence-avatar-photo${cls}"><img src="${escapeHtml(safeImageSrc(v.photo))}" alt="${escapeHtml(v.name)}" loading="lazy"></div>`
+                : `<div class="presence-avatar${cls}" style="background: ${safeColor(v.color, '#6B7280')}">${escapeHtml(v.name.charAt(0).toUpperCase())}</div>`;
             
             return `<div class="presence-expanded-item${cls}" data-user-id="${escapeHtml(v.id)}">${avatar}<span class="presence-expanded-name">${escapeHtml(v.name)}</span></div>`;
         }).join('');

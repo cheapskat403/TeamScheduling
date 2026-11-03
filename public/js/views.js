@@ -7,6 +7,9 @@ import { renderTeamsList, renderTeamLocationSelect } from './teams.js';
 import { renderLocationsList } from './locations.js';
 import { renderHolidaysList, renderHolidayYearSelect } from './holidays.js';
 import { cleanupView } from './event-manager.js';
+import { canOpenView } from './permissions.js';
+import { initAuditView } from './audit.js';
+import { initAccessView } from './access.js';
 
 // Floor plan module loading state
 let floorPlanModuleLoading = false;
@@ -19,6 +22,12 @@ let currentView = 'calendar';
  * Switch to a different view
  */
 export async function switchView(viewName, { updateUrl = true } = {}) {
+    // Pages only some people may open (the server refuses their data as well)
+    if (!canOpenView(viewName)) {
+        viewName = 'calendar';
+        updateUrl = false;
+    }
+
     // Cleanup event listeners from previous view
     if (currentView && currentView !== viewName) {
         cleanupView(currentView);
@@ -79,6 +88,14 @@ export async function switchView(viewName, { updateUrl = true } = {}) {
             
         case 'teamRoles':
             window.initTeamRolesView?.();
+            break;
+
+        case 'audit':
+            initAuditView();
+            break;
+
+        case 'access':
+            initAccessView();
             break;
     }
 }

@@ -66,12 +66,13 @@ export function getInitials(name) {
  */
 export function getAvatarHTML(managerName, imageUrl, color, className = '') {
     const safeName = escapeHtml(managerName || '');
-    const safeColor = escapeHtml(color || '#6B7280');
-    if (imageUrl) {
-        return `<img src="${imageUrl}" alt="${safeName}" class="${className}" loading="lazy">`;
+    const bg = safeColor(color, '#6B7280');
+    const src = safeImageSrc(imageUrl);
+    if (src) {
+        return `<img src="${escapeHtml(src)}" alt="${safeName}" class="${className}" loading="lazy">`;
     }
     const initials = getInitials(managerName);
-    return `<div class="${className}" style="background: ${safeColor}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;">${initials}</div>`;
+    return `<div class="${className}" style="background: ${bg}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;">${escapeHtml(initials)}</div>`;
 }
 
 /**
@@ -79,7 +80,8 @@ export function getAvatarHTML(managerName, imageUrl, color, className = '') {
  */
 export function adjustColor(color, amount) {
     const clamp = (num) => Math.min(255, Math.max(0, num));
-    const hex = color.replace('#', '');
+    let hex = safeColor(color, '#6B7280').replace('#', '');
+    if (!/^[0-9a-fA-F]{6,8}$/.test(hex)) hex = hex.length === 3 || hex.length === 4 ? hex.split('').map(c => c + c).join('') : '6B7280';
     const r = clamp(parseInt(hex.substr(0, 2), 16) + amount);
     const g = clamp(parseInt(hex.substr(2, 2), 16) + amount);
     const b = clamp(parseInt(hex.substr(4, 2), 16) + amount);
@@ -102,9 +104,30 @@ export function stringToColor(str) {
  * Escape HTML to prevent XSS
  */
 export function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    if (text === null || text === undefined) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/** A picture link we are willing to show: an image data URL, an https link or one of our own /paths. Otherwise ''. */
+export function safeImageSrc(value) {
+    if (typeof value !== 'string') return '';
+    if (/^data:image\/(?:png|jpe?g|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value)) return value;
+    if (/^https:\/\/[^\s"'<>\\`]+$/.test(value)) return value;
+    if (/^\/(?!\/)[A-Za-z0-9._/-]+$/.test(value)) return value;
+    return '';
+}
+
+/** A hex colour such as #3b82f6, or the fallback. Use for any colour that ends up in a style or attribute. */
+export function safeColor(value, fallback = '') {
+    if (typeof value !== 'string') return fallback;
+    if (/^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value)) return value;
+    if (/^hsl\(-?\d{1,3}, \d{1,3}%, \d{1,3}%\)$/.test(value)) return value;   // what stringToColor() makes
+    return fallback;
 }
 
 /**

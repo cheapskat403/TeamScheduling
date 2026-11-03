@@ -34,10 +34,15 @@ const desksRoutes = require('./routes/desks');
 const floorElementsRoutes = require('./routes/floorElements');
 const deskBookingsRoutes = require('./routes/deskBookings');
 const settingsRoutes = require('./routes/settings');
+const meRoutes = require('./routes/me');
+const auditRoutes = require('./routes/audit');
 
 // Import middleware
 const { authenticate, optionalAuth } = require('./middleware/auth');
 const { requireLoginForApi } = require('./middleware/requireAuth');
+const { attachPermissions, requireAdmin, requireCalendarAccess, onWrites } = require('./middleware/permissions');
+const { auditWrites } = require('./middleware/audit');
+const { warnIfNoAdmins } = require('./utils/permissions');
 const { socketAuth } = require('./middleware/socketAuth');
 
 // Initialize Express app
@@ -50,7 +55,11 @@ app.set('trust proxy', 1);
 
 // Create HTTP server and Socket.IO
 const httpServer = http.createServer(app);
-const io = new Server(httpServer, { cors: { origin: true, credentials: true } });
+// Pages are served from this same server, so cross-origin access is off unless CORS_ORIGINS lists origins
+const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
+const corsOrigin = allowedOrigins.length ? allowedOrigins : false;
+
+const io = new Server(httpServer, { cors: { origin: corsOrigin } });
 
 // Websockets need a valid login too when REQUIRE_AUTH=true
 io.use(socketAuth());
@@ -73,9 +82,9 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://alcdn.msauth.net", "https://unpkg.com"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://alcdn.msauth.net"],
             scriptSrcAttr: ["'unsafe-inline'"], // Allow inline event handlers (onclick, etc.)
-            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://unpkg.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "https:", "blob:"],
             connectSrc: ["'self'", "https://graph.microsoft.com", "https://login.microsoftonline.com", "wss:", "ws:"],
@@ -102,10 +111,10 @@ app.use('/api/', apiLimiter);
 app.use(compression());
 
 // Parse JSON bodies
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '1mb' }));
 
 // Enable CORS
-app.use(cors());
+app.use(cors({ origin: corsOrigin }));
 
 // Serve static files.
 // The page, scripts and styles are not fingerprinted, so they must be revalidated on every load
@@ -141,18 +150,29 @@ if (process.env.REQUIRE_AUTH === 'true' && !(process.env.AZURE_AD_TENANT_ID && p
     logger.error('REQUIRE_AUTH=true but Azure AD is not configured: every API request will be refused');
 }
 
+// What the signed-in user may do (admin, Calendar bookings, audit log), and the audit trail of every change.
+// Roles are only enforced when REQUIRE_AUTH=true. See utils/permissions.js.
+app.use('/api', attachPermissions);
+app.use('/api', auditWrites);
+warnIfNoAdmins();
+
 // Data route (initial load)
 app.use('/api/data', dataRoutes);
 
-// Resource routes (each router also protects its own writes)
-app.use('/api/bookings', bookingsRoutes);
-app.use('/api/locations', locationsRoutes);
-app.use('/api/holidays', holidaysRoutes);
-app.use('/api/teams', teamsRoutes);
-app.use('/api/desks', desksRoutes);
-app.use('/api/floor-elements', floorElementsRoutes);
+app.use('/api/me', meRoutes);
+app.use('/api/audit', auditRoutes);
+
+// Resource routes (each router also protects its own writes).
+// Anyone signed in can read. Changing teams, locations, holidays, the desk layout and settings is for
+// admins; Calendar bookings need an allowed job title (or admin); desk bookings are open to everyone.
+app.use('/api/bookings', onWrites(requireCalendarAccess), bookingsRoutes);
+app.use('/api/locations', onWrites(requireAdmin), locationsRoutes);
+app.use('/api/holidays', onWrites(requireAdmin), holidaysRoutes);
+app.use('/api/teams', onWrites(requireAdmin), teamsRoutes);
+app.use('/api/desks', onWrites(requireAdmin), desksRoutes);
+app.use('/api/floor-elements', onWrites(requireAdmin), floorElementsRoutes);
 app.use('/api/desk-bookings', deskBookingsRoutes);
-app.use('/api/settings', settingsRoutes);
+app.use('/api/settings', onWrites(requireAdmin), settingsRoutes);
 
 // QR code check-in lookup (legacy path). Same handler as /api/desk-bookings/checkin/:qrCode, and the
 // only API read that works without logging in (see PUBLIC_READ_PATHS in middleware/requireAuth.js).

@@ -4,9 +4,10 @@
  */
 
 import { state, elements } from './state.js';
-import { formatDateStr, getBookingPeopleCount, getInitials, getAvatarHTML, escapeHtml } from './utils.js';
+import { formatDateStr, getBookingPeopleCount, getInitials, getAvatarHTML, escapeHtml, safeColor, safeImageSrc } from './utils.js';
 import { loadBookingsForMonth } from './api.js';
 import { joinCurrentRoom } from './socket.js';
+import { canBookCalendar } from './permissions.js';
 
 // Navigation state to prevent rapid clicking
 let isNavigating = false;
@@ -119,8 +120,8 @@ function renderCalendarGrid(year, month, monthBookings, capacity, today, isLoadi
                 
                 dayContent += `
                     <div class="booking-chip ${isOverbooked ? 'overbooked' : ''} ${isLoadingBooking ? 'loading' : ''}" 
-                         style="background: ${escapeHtml(color)}" 
-                         draggable="${!isLoadingBooking}"
+                         style="background: ${safeColor(color, '#6B7280')}" 
+                         draggable="${!isLoadingBooking && canBookCalendar()}"
                          ondragstart="handleDragStart(event, '${escapeHtml(booking.id)}')"
                          ondragend="handleDragEnd(event)"
                          onmouseenter="showTeamTooltip(event, '${escapeHtml(booking.teamId)}')"
@@ -142,7 +143,7 @@ function renderCalendarGrid(year, month, monthBookings, capacity, today, isLoadi
             dayContent += '<div class="booking-loading-skeleton"></div>';
         }
         
-        const dropHandlers = !isWeekend && !holiday ? 
+        const dropHandlers = !isWeekend && !holiday && canBookCalendar() ? 
             `ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${dateStr}')"` : '';
         
         html += `<div class="${classes.join(' ')}" onclick="openBookingModal('${dateStr}')" ${dropHandlers}>${dayContent}</div>`;
@@ -218,17 +219,17 @@ function renderCalendarList(year, month, monthBookings, capacity, today, isLoadi
                 
                 // Avatar HTML
                 let avatarHtml = '';
-                if (managerImage) {
-                    avatarHtml = `<img src="${managerImage}" alt="${escapeHtml(managerName)}" class="calendar-list-booking-avatar" loading="lazy">`;
+                if (safeImageSrc(managerImage)) {
+                    avatarHtml = `<img src="${escapeHtml(safeImageSrc(managerImage))}" alt="${escapeHtml(managerName)}" class="calendar-list-booking-avatar" loading="lazy">`;
                 } else {
                     const initials = getInitials(managerName);
-                    avatarHtml = `<div class="calendar-list-booking-avatar" style="background: ${escapeHtml(color)}">${initials}</div>`;
+                    avatarHtml = `<div class="calendar-list-booking-avatar" style="background: ${safeColor(color, '#6B7280')}">${escapeHtml(initials)}</div>`;
                 }
                 
                 bookingsHtml += `
                     <div class="calendar-list-booking" onclick="openBookingModal('${dateStr}')">
                         ${avatarHtml}
-                        <div class="calendar-list-booking-color" style="background: ${escapeHtml(color)}"></div>
+                        <div class="calendar-list-booking-color" style="background: ${safeColor(color, '#6B7280')}"></div>
                         <div class="calendar-list-booking-info">
                             <span class="calendar-list-booking-team">${escapeHtml(displayName)}</span>
                             <span class="calendar-list-booking-count">${displayCount} people</span>

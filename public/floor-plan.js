@@ -5,10 +5,18 @@
 
 // Utility function to escape HTML (XSS prevention)
 function escapeHtmlFloorPlan(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    if (text === null || text === undefined) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/** A hex colour such as #3b82f6, or the fallback. Use for any colour that ends up in a style or attribute. */
+function safeColorFloorPlan(value, fallback = '') {
+    return typeof value === 'string' && /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value) ? value : fallback;
 }
 
 // Desk state
@@ -76,6 +84,65 @@ function askConfirm(message, { title = 'Are you sure?', confirmLabel = 'Delete',
         document.body.appendChild(overlay);
         // Default focus on the safe choice
         overlay.querySelector('[data-confirm="no"]').focus();
+    });
+}
+
+/**
+ * Asks which team the signed-in person belongs to. Resolves to a team id, '' for "no team",
+ * or undefined when the dialog is closed without choosing.
+ */
+function askTeam() {
+    return new Promise((resolve) => {
+        const current = localStorage.getItem('employeeTeamId') || '';
+        const overlay = document.createElement('div');
+        overlay.className = 'modal active confirm-modal';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.innerHTML = `
+            <div class="modal-content modal-small">
+                <div class="modal-header"><h2>Which team are you in?</h2></div>
+                <div class="confirm-body">
+                    <p class="confirm-text">Your desk takes your team's colour, and teammates are suggested to sit together. You can change this later.</p>
+                    <div class="form-group">
+                        <select id="askTeamSelect">
+                            <option value="">No team</option>
+                            ${[...state.teams].sort((a, b) => a.name.localeCompare(b.name)).map(team =>
+                                `<option value="${escapeHtmlFloorPlan(team.id)}" ${team.id === current ? 'selected' : ''}>${escapeHtmlFloorPlan(team.name)}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" data-team="cancel">Cancel</button>
+                        <button type="button" class="btn btn-primary" data-team="save">Save</button>
+                    </div>
+                </div>
+            </div>`;
+        const finish = (value) => {
+            document.removeEventListener('keydown', onKey, true);
+            overlay.remove();
+            resolve(value);
+        };
+        const onKey = (e) => {
+            if (e.key === 'Escape') { e.stopPropagation(); finish(undefined); }
+        };
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) return finish(undefined);
+            const btn = e.target.closest('[data-team]');
+            if (!btn) return;
+            if (btn.dataset.team === 'cancel') return finish(undefined);
+            const value = overlay.querySelector('#askTeamSelect').value;
+            if (value) {
+                localStorage.setItem('employeeTeamId', value);
+                localStorage.removeItem('employeeTeamSkipped');
+            } else {
+                localStorage.removeItem('employeeTeamId');
+                localStorage.setItem('employeeTeamSkipped', '1');
+            }
+            finish(value);
+        });
+        document.addEventListener('keydown', onKey, true);
+        document.body.appendChild(overlay);
+        overlay.querySelector('#askTeamSelect').focus();
     });
 }
 
@@ -156,6 +223,18 @@ async function deskApi(method, url, body) {
 
 // ---------- loading ----------
 
+/** Teams booked into the office (by their managers) for a date range. Never blocks the desks page. */
+async function fetchTeamBookings(locationId, from, to) {
+    try {
+        const response = await fetch(`/api/bookings?locationId=${encodeURIComponent(locationId)}&from=${from}&to=${to}`);
+        if (!response.ok) return [];
+        const rows = await response.json();
+        return Array.isArray(rows) ? rows : [];
+    } catch (error) {
+        return [];
+    }
+}
+
 async function loadDesks() {
     try {
         const locationId = state.currentLocation;
@@ -163,9 +242,10 @@ async function loadDesks() {
         const from = mondayOf(deskState.selectedDate);
         const to = addDays(from, 6);
 
-        const [desks, bookings, elements, underlaySetting] = await Promise.all([
+        const [desks, bookings, teamBookings, elements, underlaySetting] = await Promise.all([
             fetch(`/api/desks?locationId=${locationId}`).then(r => r.json()),
             fetch(`/api/desk-bookings?locationId=${locationId}&from=${from}&to=${to}`).then(r => r.json()),
+            fetchTeamBookings(locationId, from, to),
             fetch(`/api/floor-elements?locationId=${locationId}&floor=${floor}`).then(r => r.json()),
             fetch(`/api/settings/floorplan_bg_${locationId}_${floor}`).then(r => r.json()).catch(() => ({ value: null }))
         ]);
@@ -175,6 +255,7 @@ async function loadDesks() {
         deskState.allDesks = desks;
         deskState.desks = desks.filter(d => (d.floor || '1') === floor);
         deskState.rangeBookings = bookings;
+        deskState.teamBookings = teamBookings;
         deskState.rangeFrom = from;
         deskState.rangeTo = to;
         deskState.floorElements = elements;
@@ -446,7 +527,7 @@ function renderFloorMap() {
     const underlay = deskState.underlay;
     if (underlay) {
         html += `<img class="floor-underlay" src="${escapeHtmlFloorPlan(underlay.url)}" alt="" draggable="false"
-                     style="left: ${underlay.x || 0}px; top: ${underlay.y || 0}px; width: ${underlay.width}px; height: ${underlay.height}px;">`;
+                     style="left: ${Number(underlay.x) || 0}px; top: ${Number(underlay.y) || 0}px; width: ${Number(underlay.width) || 0}px; height: ${Number(underlay.height) || 0}px;">`;
     }
 
     // Rooms/walls/labels (bottom layer). The drawing already shows them, so hide them unless editing.
@@ -455,7 +536,7 @@ function renderFloorMap() {
         const isSelected = deskState.selectedElement?.id === el.id;
 
         if (el.type === 'room') {
-            const style = `left: ${el.x || 0}px; top: ${el.y || 0}px; width: ${el.width || 150}px; height: ${el.height || 120}px; ${el.color ? `border-color: ${el.color}50; background: ${el.color}08;` : ''}`;
+            const style = `left: ${el.x || 0}px; top: ${el.y || 0}px; width: ${el.width || 150}px; height: ${el.height || 120}px; ${safeColorFloorPlan(el.color) ? `border-color: ${safeColorFloorPlan(el.color)}50; background: ${safeColorFloorPlan(el.color)}08;` : ''}`;
             const resizeHandles = deskState.editMode ? `
                 <div class="resize-handle nw" data-handle="nw"></div>
                 <div class="resize-handle ne" data-handle="ne"></div>
@@ -544,7 +625,7 @@ function renderFloorMap() {
         else statusClass = 'hotseat';
 
         const team = booking ? deskTeam(booking.teamId) : (isTeamSeat ? deskTeam(desk.assignedTeamId) : null);
-        const teamColor = team && team.color ? team.color : '';
+        const teamColor = team && team.color ? safeColorFloorPlan(team.color) : '';
         const isSelected = deskState.selectedElement?.id === desk.id;
         const isSuggested = deskState.suggestion?.deskId === desk.id;
         const chairPositions = desk.chairPositions || ['bottom'];
@@ -918,6 +999,7 @@ function loadDeskPhoto(email) {
 }
 
 function setAvatarPhoto(el, url) {
+    if (typeof url !== 'string' || !/^(?:data:image\/(?:png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+|blob:[^\s"'()\\]+)$/.test(url)) return;
     el.style.backgroundImage = `url("${url}")`;
     el.classList.add('has-photo');
 }
@@ -984,7 +1066,7 @@ function showDeskHover(desk, anchor) {
         const status = booking.checkedIn ? 'Checked in' : (deskState.selectedDate === todayStr() ? 'Not checked in yet' : 'Booked');
         el.innerHTML = `
             <div class="hover-person">
-                <span class="avatar lg"${photoAttr(booking)} style="--team-color: ${escapeHtmlFloorPlan(team?.color || '')}">${escapeHtmlFloorPlan(deskInitials(booking.employeeName))}</span>
+                <span class="avatar lg"${photoAttr(booking)} style="--team-color: ${safeColorFloorPlan(team?.color)}">${escapeHtmlFloorPlan(deskInitials(booking.employeeName))}</span>
                 <div class="hover-text">
                     <div class="hover-name">${escapeHtmlFloorPlan(booking.employeeName)}${mine ? ' (you)' : ''}</div>
                     <div class="hover-sub">${escapeHtmlFloorPlan(team?.name || 'No team')}</div>
@@ -1072,7 +1154,7 @@ function showDeskCard(desk, anchor) {
         const team = deskTeam(booking.teamId);
         status = `
             <div class="card-person">
-                <span class="avatar"${photoAttr(booking)} style="--team-color: ${escapeHtmlFloorPlan(team?.color || '')}">${escapeHtmlFloorPlan(deskInitials(booking.employeeName))}</span>
+                <span class="avatar"${photoAttr(booking)} style="--team-color: ${safeColorFloorPlan(team?.color)}">${escapeHtmlFloorPlan(deskInitials(booking.employeeName))}</span>
                 <div>
                     <div class="card-person-name">${escapeHtmlFloorPlan(booking.employeeName)}${mine ? ' (you)' : ''}</div>
                     <div class="card-person-sub">${escapeHtmlFloorPlan(team?.name || 'No team')}</div>
@@ -1178,15 +1260,23 @@ async function refreshBookings() {
     const from = deskState.rangeFrom || mondayOf(deskState.selectedDate);
     const to = deskState.rangeTo || addDays(from, 6);
     deskState.rangeBookings = await fetch(`/api/desk-bookings?locationId=${state.currentLocation}&from=${from}&to=${to}`).then(r => r.json());
+    deskState.teamBookings = await fetchTeamBookings(state.currentLocation, from, to);
     deskState.deskBookings = deskState.rangeBookings.filter(b => b.date === deskState.selectedDate);
     renderAllDesks();
 }
 
 async function bookDesk(desk) {
-    const me = deskMe();
+    let me = deskMe();
     if (!me.name) {
         showQuickBookModal(desk);
         return;
+    }
+
+    // Signed-in people never see the quick-book form, so ask for their team the first time
+    if (!me.teamId && !localStorage.getItem('employeeTeamSkipped') && state.teams.length) {
+        const chosen = await askTeam();
+        if (chosen === undefined) return;   // closed the dialog: don't book
+        me = deskMe();
     }
 
     const deskEl = document.getElementById(`desk-${desk.id}`);
@@ -1348,6 +1438,7 @@ function renderMyDayCard() {
             <div class="my-desk-name">${escapeHtmlFloorPlan(mine.deskName)}</div>
             ${meta ? `<div class="my-desk-meta">${escapeHtmlFloorPlan(meta)}</div>` : ''}
             ${mine.checkedIn ? `<div class="card-status ok">✓ Checked in</div>` : ''}
+            ${myTeamLine(me)}
             <div class="side-actions">
                 <button class="btn btn-secondary btn-small" id="showMyDeskBtn">Show on map</button>
                 ${past ? '' : `<button class="btn btn-danger btn-small" id="cancelMyDeskBtn">Cancel</button>`}
@@ -1355,6 +1446,7 @@ function renderMyDayCard() {
         document.getElementById('showMyDeskBtn').onclick = () => focusDesk(mine.deskId);
         const cancelBtn = document.getElementById('cancelMyDeskBtn');
         if (cancelBtn) cancelBtn.onclick = () => cancelMyBooking(mine.id);
+        wireTeamLine();
         return;
     }
 
@@ -1362,12 +1454,29 @@ function renderMyDayCard() {
     card.innerHTML = `
         <div class="side-eyebrow">${escapeHtmlFloorPlan(dayLabel)}</div>
         <div class="my-desk-name muted">${past ? 'No desk booked' : 'No desk yet'}</div>
-        ${me.name || window.currentUser ? '' : `<div class="my-desk-meta">Click a desk and enter your name to book.</div>`}
+        ${me.name || window.currentUser ? myTeamLine(me) : `<div class="my-desk-meta">Click a desk and enter your name to book.</div>`}
         ${past ? '' : `<button class="btn btn-primary btn-full" id="findDeskBtn" ${free > 0 ? '' : 'disabled'}>
             ${free > 0 ? 'Find me a desk' : 'Fully booked'}
         </button>`}`;
     const btn = document.getElementById('findDeskBtn');
     if (btn) btn.onclick = findMeADesk;
+    wireTeamLine();
+}
+
+/** "Team: X · change", shown in the My day card */
+function myTeamLine(me) {
+    const team = deskTeam(me.teamId);
+    return `<div class="my-desk-meta">Team: ${team ? escapeHtmlFloorPlan(team.name) : 'none'} · <a href="#" id="changeTeamLink">change</a></div>`;
+}
+
+function wireTeamLine() {
+    const link = document.getElementById('changeTeamLink');
+    if (!link) return;
+    link.onclick = async (e) => {
+        e.preventDefault();
+        const chosen = await askTeam();
+        if (chosen !== undefined) renderAllDesks();
+    };
 }
 
 function renderWhosIn() {
@@ -1378,8 +1487,17 @@ function renderWhosIn() {
     const bookings = [...deskState.deskBookings].sort((a, b) => (a.employeeName || '').localeCompare(b.employeeName || ''));
     count.textContent = bookings.length;
 
-    if (!bookings.length) {
-        list.innerHTML = `<p class="whos-in-empty">Nobody has booked a desk for this day yet.</p>`;
+    // Teams their managers booked in for this day, whether or not anyone has picked a seat yet
+    const bookedTeams = new Map();
+    for (const tb of (deskState.teamBookings || []).filter(b => b.date === deskState.selectedDate)) {
+        const team = deskTeam(tb.teamId);
+        const name = team ? team.name : (tb.teamName || '');
+        if (!name) continue;
+        bookedTeams.set(team ? team.id : `name:${name}`, { team, name });
+    }
+
+    if (!bookings.length && !bookedTeams.size) {
+        list.innerHTML = `<p class="whos-in-empty">No teams or desks booked for this day yet.</p>`;
         return;
     }
 
@@ -1387,25 +1505,30 @@ function renderWhosIn() {
     for (const b of bookings) {
         const team = deskTeam(b.teamId);
         const key = team ? team.id : '';
-        if (!groups.has(key)) groups.set(key, { team, people: [] });
+        if (!groups.has(key)) groups.set(key, { team, name: team ? team.name : '', people: [] });
         groups.get(key).people.push(b);
     }
+    for (const [key, entry] of bookedTeams) {
+        if (!groups.has(key)) groups.set(key, { team: entry.team, name: entry.name, people: [] });
+    }
     const ordered = [...groups.values()].sort((a, b) => {
-        if (!a.team) return 1;
-        if (!b.team) return -1;
-        return a.team.name.localeCompare(b.team.name);
+        if (!a.name) return 1;
+        if (!b.name) return -1;
+        return a.name.localeCompare(b.name);
     });
 
     list.innerHTML = ordered.map(g => `
         <div class="whos-in-group">
             <div class="whos-in-team">
-                <span class="team-dot" style="background: ${escapeHtmlFloorPlan(g.team?.color || '#6b7a8c')}"></span>
-                ${escapeHtmlFloorPlan(g.team?.name || 'No team')}
-                <span class="whos-in-team-count">${g.people.length}</span>
+                <span class="team-dot" style="background: ${safeColorFloorPlan(g.team?.color, '#6b7a8c')}"></span>
+                ${escapeHtmlFloorPlan(g.name || 'No team')}
+                ${g.people.length
+                    ? `<span class="whos-in-team-count">${g.people.length}</span>`
+                    : `<span class="whos-in-team-count whos-in-team-empty">no seats yet</span>`}
             </div>
             ${g.people.map(b => `
                 <button class="whos-in-row ${isMyBooking(b) ? 'me' : ''}" data-desk-id="${escapeHtmlFloorPlan(b.deskId)}">
-                    <span class="avatar sm"${photoAttr(b)} style="--team-color: ${escapeHtmlFloorPlan(g.team?.color || '')}">${escapeHtmlFloorPlan(deskInitials(b.employeeName))}</span>
+                    <span class="avatar sm"${photoAttr(b)} style="--team-color: ${safeColorFloorPlan(g.team?.color)}">${escapeHtmlFloorPlan(deskInitials(b.employeeName))}</span>
                     <span class="whos-in-name">${escapeHtmlFloorPlan(b.employeeName)}${isMyBooking(b) ? ' (you)' : ''}</span>
                     <span class="whos-in-desk">${escapeHtmlFloorPlan(b.deskName)}</span>
                 </button>`).join('')}
@@ -2321,13 +2444,13 @@ function openDeskBookingModal(deskId) {
         const sortedTeams = [...state.teams].sort((a, b) => a.name.localeCompare(b.name));
         teamSelect.innerHTML = '<option value="">-- No team --</option>' + 
             sortedTeams.map(team => 
-                `<option value="${escapeHtmlFloorPlan(team.id)}" ${team.id === savedTeamId ? 'selected' : ''} style="color: ${escapeHtmlFloorPlan(team.color)}">${escapeHtmlFloorPlan(team.name)}</option>`
+                `<option value="${escapeHtmlFloorPlan(team.id)}" ${team.id === savedTeamId ? 'selected' : ''} style="color: ${safeColorFloorPlan(team.color)}">${escapeHtmlFloorPlan(team.name)}</option>`
             ).join('');
     }
     
     infoDiv.innerHTML = `
         <h3>${escapeHtmlFloorPlan(desk.name)}</h3>
-        <p>${escapeHtmlFloorPlan(location?.name || '')} ${desk.floor ? `• Floor ${desk.floor}` : ''} ${desk.zone ? `• ${escapeHtmlFloorPlan(desk.zone)}` : ''}</p>
+        <p>${escapeHtmlFloorPlan(location?.name || '')} ${desk.floor ? `• Floor ${escapeHtmlFloorPlan(desk.floor)}` : ''} ${desk.zone ? `• ${escapeHtmlFloorPlan(desk.zone)}` : ''}</p>
         <p class="booking-date">${new Date(deskState.selectedDate).toLocaleDateString('en-ZA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
         <p class="booking-type">${isBooked ? 'Currently Booked' : 'Full Day Booking'}</p>
     `;
@@ -2410,10 +2533,10 @@ function renderDeskBookingsList(deskId) {
     container.innerHTML = deskBookings.map(booking => {
         return `
             <div class="desk-booking-item ${booking.checkedIn ? 'checked-in' : ''}">
-                <div class="booking-person">${booking.employeeName}</div>
+                <div class="booking-person">${escapeHtmlFloorPlan(booking.employeeName)}</div>
                 <div class="booking-duration">Full Day</div>
                 ${booking.checkedIn ? '<span class="checked-in-badge">Checked In</span>' : ''}
-                <button class="btn btn-small btn-danger" data-booking-id="${booking.id}" data-desk-id="${deskId}" onclick="cancelDeskBooking(this.dataset.bookingId, this.dataset.deskId)">Cancel</button>
+                <button class="btn btn-small btn-danger" data-booking-id="${escapeHtmlFloorPlan(booking.id)}" data-desk-id="${escapeHtmlFloorPlan(deskId)}" onclick="cancelDeskBooking(this.dataset.bookingId, this.dataset.deskId)">Cancel</button>
             </div>
         `;
     }).join('');
@@ -2462,7 +2585,7 @@ function showDeskQR(deskId) {
     modal.innerHTML = `
         <div class="modal-content modal-small" style="text-align: center;">
             <div class="modal-header">
-                <h2>QR Code: ${desk.name}</h2>
+                <h2>QR Code: ${escapeHtmlFloorPlan(desk.name)}</h2>
                 <button class="modal-close" onclick="document.getElementById('qrModal').remove()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -2476,7 +2599,7 @@ function showDeskQR(deskId) {
                     Scan this QR code at the desk to check in
                 </p>
                 <p style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted); word-break: break-all;">
-                    ${qrUrl}
+                    ${escapeHtmlFloorPlan(qrUrl)}
                 </p>
                 <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.open('${qrImageUrl}', '_blank')">
                     Download QR Code

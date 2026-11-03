@@ -252,6 +252,24 @@ describe('GET /api/bookings with month filter', () => {
         expect(response.body.length).toBe(2);
     });
 
+    test('includes bookings on the last day of the month (whatever time zone the server is in)', async () => {
+        mockData.bookings.push({ id: '4', date: '2024-01-31', team_id: 'team1', location_id: 'loc1', people_count: 1 });
+        const response = await request(app).get('/api/bookings?year=2024&month=0').expect(200);
+        expect(response.body.map(b => b.id)).toContain('4');
+    });
+
+    test('filters by a date range (from and to, both ends included)', async () => {
+        const response = await request(app)
+            .get('/api/bookings?from=2024-01-15&to=2024-01-25')
+            .expect(200);
+        expect(response.body.map(b => b.id).sort()).toEqual(['1', '2']);
+    });
+
+    test('refuses a date range that is not real dates', async () => {
+        await request(app).get('/api/bookings?from=2024-01-15&to=soon').expect(400);
+        await request(app).get('/api/bookings?from=2024-02-30&to=2024-03-01').expect(400);
+    });
+
     test('supports both location and locationId parameters', async () => {
         const response1 = await request(app)
             .get('/api/bookings?location=loc1')

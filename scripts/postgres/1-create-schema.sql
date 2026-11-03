@@ -1,6 +1,6 @@
--- PostgreSQL Schema for Office Booking System
--- Run this in your PostgreSQL database (not Supabase)
--- Usage: psql -U office_app -d office_booking -f postgresql-schema.sql
+-- PostgreSQL Schema for Office Booking System (plain PostgreSQL, e.g. Azure Database for PostgreSQL)
+-- Same tables as supabase-schema.sql, without the Supabase-only parts (RLS, anon/authenticated roles).
+-- Usage: psql "$DATABASE_URL" -f scripts/postgres/1-create-schema.sql   (or: node scripts/migrate-supabase-to-postgres.js --schema-only)
 
 -- ============================================
 -- LOCATIONS TABLE
@@ -136,20 +136,26 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 -- ============================================
--- GRANT PERMISSIONS
+-- AUDIT LOG (every change made through the app, and every refused attempt)
 -- ============================================
--- Grant all privileges to application user
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO office_app;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO office_app;
-GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO office_app;
+CREATE TABLE IF NOT EXISTS audit_log (
+    id BIGSERIAL PRIMARY KEY,
+    at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    actor_email TEXT,                          -- who did it (NULL when logins are not enforced)
+    actor_name TEXT,
+    actor_id TEXT,
+    action TEXT NOT NULL,                      -- create, update, delete, check-in
+    entity TEXT,                               -- bookings, teams, desks, settings ...
+    entity_id TEXT,
+    outcome TEXT NOT NULL DEFAULT 'success',   -- success, denied (not allowed) or failed
+    status INTEGER,                            -- HTTP status of the answer
+    details JSONB                              -- the request, cut down (no photos or QR codes)
+);
 
--- Grant privileges on future tables
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO office_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO office_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO office_app;
+CREATE INDEX IF NOT EXISTS idx_audit_log_at ON audit_log(at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_log_actor ON audit_log(actor_email);
+CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity, entity_id);
 
--- Note: Row Level Security (RLS) is a Supabase-specific feature
--- For PostgreSQL, use standard GRANT/REVOKE permissions instead
--- If you need RLS, you can enable it per table:
--- ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow all on locations" ON locations FOR ALL USING (true) WITH CHECK (true);
+-- No GRANT statements: run this as the application's own database user, which then owns the tables.
+-- Row Level Security is a Supabase feature and is not used here; access is controlled by the database
+-- user's credentials and the network firewall.

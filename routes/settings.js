@@ -8,6 +8,11 @@ const router = express.Router();
 const { supabase } = require('../config/supabase');
 const logger = require('../utils/logger');
 const { requireAuthForWrites } = require('../middleware/requireAuth');
+const { settingValue, ValidationError } = require('../utils/validate');
+const { invalidateConfig, enforced } = require('../utils/permissions');
+
+// Who the admins are and who may read the audit log: only admins can even see these lists
+const ADMIN_ONLY_KEYS = ['admin_emails', 'audit_viewer_roles'];
 
 // Apply auth middleware - GET allowed without auth, PUT requires auth
 router.use(requireAuthForWrites);
@@ -18,6 +23,10 @@ router.use(requireAuthForWrites);
 router.get('/:key', async (req, res) => {
     try {
         const { key } = req.params;
+
+        if (ADMIN_ONLY_KEYS.includes(key) && enforced() && !(req.permissions && req.permissions.isAdmin)) {
+            return res.status(403).json({ error: 'Only administrators can see this setting', code: 'FORBIDDEN' });
+        }
         
         const { data, error } = await supabase
             .from('settings')
@@ -33,6 +42,8 @@ router.get('/:key', async (req, res) => {
         if (!data) {
             const defaults = {
                 'team_roles': [],
+                'admin_emails': [],
+                'audit_viewer_roles': [],
             };
             return res.json({ value: defaults[key] || null });
         }
@@ -50,20 +61,16 @@ router.get('/:key', async (req, res) => {
 router.put('/:key', async (req, res) => {
     try {
         const { key } = req.params;
-        const { value } = req.body;
-        
-        if (value === undefined) {
-            return res.status(400).json({ error: 'Value is required' });
-        }
-        
-        // Validate known settings
-        if (key === 'team_roles') {
-            if (!Array.isArray(value)) {
-                return res.status(400).json({ error: 'team_roles must be an array' });
+
+        // Checks the name, and the value for the settings we know (team roles, floor plan backgrounds)
+        let value;
+        try {
+            value = settingValue(key, req.body && req.body.value);
+        } catch (validationError) {
+            if (validationError instanceof ValidationError) {
+                return res.status(400).json({ error: validationError.message, code: 'INVALID_INPUT' });
             }
-            if (!value.every(v => typeof v === 'string')) {
-                return res.status(400).json({ error: 'team_roles must be an array of strings' });
-            }
+            throw validationError;
         }
         
         const { data, error } = await supabase
@@ -80,6 +87,7 @@ router.put('/:key', async (req, res) => {
         
         if (error) throw error;
         
+        invalidateConfig();   // role settings apply straight away
         logger.info(`Setting updated: ${key}`);
         res.json({ value: data.value });
     } catch (error) {

@@ -4,6 +4,7 @@ const { supabase } = require('../config/supabase');
 const { toCamelCase } = require('../utils/helpers');
 const logger = require('../utils/logger');
 const { requireAuthForWrites } = require('../middleware/requireAuth');
+const { validateBody, icsText, checks, ValidationError } = require('../utils/validate');
 
 // Apply auth middleware to all routes in this router
 // GET requests allowed without auth, POST/PUT/DELETE require auth (if REQUIRE_AUTH=true)
@@ -26,16 +27,26 @@ function initBookingsRoutes(socketFns) {
  */
 router.get('/', async (req, res) => {
     try {
-        const { year, month, location, locationId, date } = req.query;
+        const { year, month, location, locationId, date, from, to } = req.query;
         
         let query = supabase.from('bookings').select('*');
         
         // Filter by specific date if provided
         if (date) {
             query = query.eq('date', date);
+        } else if (from && to) {
+            // A date range (used by the Desks page to show which teams are in this week)
+            try {
+                query = query.gte('date', checks.date(from, 'from')).lte('date', checks.date(to, 'to'));
+            } catch (validationError) {
+                if (validationError instanceof ValidationError) {
+                    return res.status(400).json({ error: validationError.message, code: 'INVALID_INPUT' });
+                }
+                throw validationError;
+            }
         } else if (year && month) {
             const startDate = `${year}-${String(parseInt(month) + 1).padStart(2, '0')}-01`;
-            const endDate = new Date(parseInt(year), parseInt(month) + 1, 0).toISOString().split('T')[0];
+            const endDate = new Date(Date.UTC(parseInt(year), parseInt(month) + 1, 0)).toISOString().split('T')[0];   // last day of the month, in UTC so the server's time zone can't shift it
             query = query.gte('date', startDate).lte('date', endDate);
         }
         
@@ -58,7 +69,7 @@ router.get('/', async (req, res) => {
 /**
  * Create a new booking
  */
-router.post('/', async (req, res) => {
+router.post('/', validateBody('booking'), async (req, res) => {
     try {
         const { date, teamId, teamName, peopleCount, locationId, notes } = req.body;
         
@@ -151,7 +162,7 @@ router.post('/', async (req, res) => {
 /**
  * Update a booking
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', validateBody('booking'), async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
@@ -290,9 +301,9 @@ router.get('/:id/ics', async (req, res) => {
             'BEGIN:VEVENT',
             `DTSTART;VALUE=DATE:${startDate}`,
             `DTEND;VALUE=DATE:${startDate}`,
-            `SUMMARY:${booking.team_name} - Office Booking`,
-            `DESCRIPTION:Team: ${booking.team_name}\\nPeople: ${booking.people_count}\\nManager: ${team?.manager || 'N/A'}\\n${booking.notes || ''}`,
-            `LOCATION:${location?.name || 'Office'}`,
+            `SUMMARY:${icsText(booking.team_name)} - Office Booking`,
+            `DESCRIPTION:Team: ${icsText(booking.team_name)}\\nPeople: ${booking.people_count}\\nManager: ${icsText(team?.manager || 'N/A')}\\n${icsText(booking.notes)}`,
+            `LOCATION:${icsText(location?.name || 'Office')}`,
             `UID:${booking.id}@officebooking`,
             'STATUS:CONFIRMED',
             'END:VEVENT',
