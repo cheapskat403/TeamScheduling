@@ -322,6 +322,19 @@
             });
         }
         
+        // Shown on the page itself, where the person is looking, instead of a browser popup
+        function showCheckInError(message) {
+            let banner = document.getElementById('checkinError');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'checkinError';
+                banner.className = 'message error';
+                banner.setAttribute('role', 'alert');
+                document.getElementById('content').before(banner);
+            }
+            banner.textContent = message;
+        }
+
         async function checkIn(bookingId) {
             try {
                 const headers = { 'Content-Type': 'application/json' };
@@ -340,10 +353,11 @@
                 }
                 
                 // Reload to show updated status
+                document.getElementById('checkinError')?.remove();
                 loadDeskInfo();
                 
             } catch (error) {
-                alert(error.message || 'Check-in failed');
+                showCheckInError(error.message || 'Check-in failed');
             }
         }
         

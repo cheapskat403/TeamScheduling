@@ -9,6 +9,7 @@ import { createLocation, updateLocation, deleteLocationApi } from './api.js';
 import { renderTeamSelect } from './teams.js';
 import { validateLocation, showValidationErrors } from './validation.js';
 import { setButtonLoading } from './loading.js';
+import { askConfirm } from './confirm.js';
 
 /**
  * Render location select dropdown (sorted alphabetically)
@@ -145,7 +146,7 @@ export async function deleteLocation(id) {
     const location = state.locations.find(l => l.id === id);
     if (!location) return;
     
-    if (!confirm(`Delete location "${location.name}"? This will delete all bookings at this location.`)) return;
+    if (!await askConfirm(`Delete location "${location.name}"? This will delete all bookings at this location.`, { title: 'Delete location' })) return;
     
     try {
         await deleteLocationApi(id);

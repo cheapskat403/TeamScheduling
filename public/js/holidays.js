@@ -7,6 +7,7 @@ import { state } from './state.js';
 import { showToast, escapeHtml } from './utils.js';
 import { fetchHolidaysFromApi, saveHolidays, deleteHolidayApi } from './api.js';
 import { renderCalendar } from './calendar.js';
+import { askConfirm } from './confirm.js';
 
 /**
  * Render the holiday year selector
@@ -120,7 +121,9 @@ export async function fetchHolidays() {
  * Delete a holiday
  */
 export async function deleteHoliday(date) {
-    if (!confirm('Delete this holiday?')) return;
+    const holiday = state.publicHolidays.find(h => h.date === date);
+    const what = holiday ? `"${holiday.name}" (${holiday.date})` : 'this holiday';
+    if (!await askConfirm(`Delete ${what}?`, { title: 'Delete holiday' })) return;
     
     try {
         await deleteHolidayApi(date);

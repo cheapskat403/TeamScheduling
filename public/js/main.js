@@ -42,6 +42,7 @@ import {
 } from './azure-managers.js';
 import { formatDateStr, showToast } from './utils.js';
 import { loadPermissions } from './permissions.js';
+import './confirm.js';
 
 /**
  * Initialize the application

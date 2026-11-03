@@ -9,6 +9,7 @@ import { createBooking, updateBooking, deleteBookingApi, invalidateBookingsCache
 import { renderCalendar } from './calendar.js';
 import { validateBooking, showValidationErrors } from './validation.js';
 import { setButtonLoading } from './loading.js';
+import { askConfirm } from './confirm.js';
 
 // Track if currently overbooking
 let isOverbooking = false;
@@ -347,7 +348,10 @@ export function editBooking(id) {
  * Delete a booking
  */
 export async function deleteBooking(id) {
-    if (!confirm('Delete this booking?')) return;
+    const booking = state.bookings.find(b => b.id === id);
+    const team = booking && state.teams.find(t => t.id === booking.teamId);
+    const what = booking ? `the booking for ${(team && team.name) || booking.teamName} on ${formatDisplayDate(booking.date)}` : 'this booking';
+    if (!await askConfirm(`Delete ${what}?`, { title: 'Delete booking' })) return;
     
     try {
         await deleteBookingApi(id);

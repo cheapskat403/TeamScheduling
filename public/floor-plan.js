@@ -43,48 +43,11 @@ let deskState = {
 // ---------- small helpers ----------
 
 /**
- * Promise-based confirmation dialog. Used instead of window.confirm(), which some
- * browsers (including embedded ones) block by silently returning false.
+ * In-app confirmation dialog (shared with the rest of the app, see js/confirm.js). main.js has loaded it
+ * by the time this script is added to the page.
  */
-function askConfirm(message, { title = 'Are you sure?', confirmLabel = 'Delete', danger = true } = {}) {
-    return new Promise((resolve) => {
-        const overlay = document.createElement('div');
-        overlay.className = 'modal active confirm-modal';
-        overlay.setAttribute('role', 'alertdialog');
-        overlay.setAttribute('aria-modal', 'true');
-        overlay.innerHTML = `
-            <div class="modal-content modal-small">
-                <div class="modal-header"><h2></h2></div>
-                <div class="confirm-body">
-                    <p class="confirm-text"></p>
-                    <div class="form-actions">
-                        <button type="button" class="btn btn-secondary" data-confirm="no">Cancel</button>
-                        <button type="button" class="btn ${danger ? 'btn-danger' : 'btn-primary'}" data-confirm="yes"></button>
-                    </div>
-                </div>
-            </div>`;
-        overlay.querySelector('h2').textContent = title;
-        overlay.querySelector('.confirm-text').textContent = message;
-        overlay.querySelector('[data-confirm="yes"]').textContent = confirmLabel;
-
-        const finish = (answer) => {
-            document.removeEventListener('keydown', onKey, true);
-            overlay.remove();
-            resolve(answer);
-        };
-        const onKey = (e) => {
-            if (e.key === 'Escape') { e.stopPropagation(); finish(false); }
-        };
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) return finish(false);
-            const btn = e.target.closest('[data-confirm]');
-            if (btn) finish(btn.dataset.confirm === 'yes');
-        });
-        document.addEventListener('keydown', onKey, true);
-        document.body.appendChild(overlay);
-        // Default focus on the safe choice
-        overlay.querySelector('[data-confirm="no"]').focus();
-    });
+function askConfirm(message, options) {
+    return window.confirmDialog(message, options);
 }
 
 /**

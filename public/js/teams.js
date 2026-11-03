@@ -9,6 +9,7 @@ import { createTeam, updateTeam, deleteTeamApi, invalidateBookingsCache, loadBoo
 import { renderCalendar } from './calendar.js';
 import { validateTeam, showValidationErrors } from './validation.js';
 import { setButtonLoading } from './loading.js';
+import { askConfirm } from './confirm.js';
 
 /**
  * Render team select dropdown (sorted alphabetically)
@@ -263,7 +264,7 @@ export async function deleteTeam(id) {
     const team = state.teams.find(t => t.id === id);
     if (!team) return;
     
-    if (!confirm(`Delete team "${team.name}"? This will also delete all their bookings.`)) return;
+    if (!await askConfirm(`Delete team "${team.name}"? This will also delete all their bookings.`, { title: 'Delete team' })) return;
     
     try {
         await deleteTeamApi(id);
