@@ -24,7 +24,7 @@ single transaction, then compares every table's keys with the source; a mismatch
 
 1. Put the target's `DB_*` settings and the source's `SUPABASE_URL` / `SUPABASE_SECRET_KEY` in your environment.
 2. `node scripts/migrate-supabase-to-postgres.js --dry-run` reads the source, checks the target and writes nothing.
-3. `node scripts/migrate-supabase-to-postgres.js` creates the tables from `postgresql-schema.sql` and copies the data.
+3. `node scripts/migrate-supabase-to-postgres.js` creates the tables from `scripts/postgres/1-create-schema.sql` and copies the data.
    It refuses to run if the target already has rows; add `--replace` to empty the target's tables first.
 4. Set `DB_PROVIDER=postgres` where the app runs, restart, and check the app.
 
@@ -32,23 +32,34 @@ To go back, set `DB_PROVIDER=supabase`. Anything written to the new database aft
 
 `node scripts/migrate-supabase-to-postgres.js --schema-only` just creates the empty tables.
 
-## Doing it by hand (when this machine cannot reach the database)
+## Doing it by hand: the scripts in scripts/postgres/
 
-Two plain SQL files, run on any machine or tool that can reach the database (`psql`, Azure's query tools, a jump host):
+Plain PostgreSQL scripts you run yourself, from any machine that can reach the databases (psql and pg_dump are needed;
+they come with a normal PostgreSQL install).
 
-1. `postgresql-schema.sql` creates the tables. It is safe to run twice.
-2. A data file made from Supabase. Create it anywhere that can reach Supabase (no target database needed):
-   `node scripts/migrate-supabase-to-postgres.js --export-sql=data.sql`
-   Run it on an **empty** database after step 1. It is one transaction, so a failure changes nothing, and it ends with a table of row
-   counts. The expected counts are written in a comment in the file. `data.sql` holds real data (names, emails, photos): it is
-   ignored by git, keep it private and delete it when done.
-
-With `psql`:
+| Script | What it does |
+| --- | --- |
+| `1-create-schema.sql` | Creates the tables on the target. Safe to run twice. |
+| `2-copy-data.ps1` | Dumps the data from the source with pg_dump (read only) and loads it into the **empty** target in one transaction, then fixes the holiday id sequence. |
+| `3-verify.sql` | Run on both databases. Row counts and a key fingerprint per table must be identical. |
 
 ```
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f postgresql-schema.sql
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f data.sql
+psql "$TARGET_DB_URL" -v ON_ERROR_STOP=1 -f scripts/postgres/1-create-schema.sql
+
+$env:SOURCE_DB_URL = Read-Host "Source (Supabase) connection string"
+$env:TARGET_DB_URL = Read-Host "Target (Azure) connection string"
+./scripts/postgres/2-copy-data.ps1
+
+psql $env:SOURCE_DB_URL -f scripts/postgres/3-verify.sql
+psql $env:TARGET_DB_URL -f scripts/postgres/3-verify.sql
 ```
+
+Connection strings look like `postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require`. For Supabase use Project Settings >
+Database > Connection string (direct or session pooler, not the transaction pooler).
+
+If the machine that can reach Azure cannot reach Supabase, run the Node tool somewhere that can reach Supabase to make a plain
+SQL file, `node scripts/migrate-supabase-to-postgres.js --export-sql=data.sql`, and run that file on the target after step 1
+(`psql "$TARGET_DB_URL" -v ON_ERROR_STOP=1 -f data.sql`). It holds real data: it is ignored by git, keep it private.
 
 ## Not covered by the switch
 

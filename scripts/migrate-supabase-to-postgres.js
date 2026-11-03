@@ -85,7 +85,7 @@ function literal(table, column, value) {
 
 // Writes the data as a plain SQL script: one transaction, parents first, then a count of every table.
 async function exportSql(supabase, file) {
-    const out = ['-- Data export from Supabase. Run postgresql-schema.sql first, then this file, on an EMPTY database.',
+    const out = ['-- Data export from Supabase. Run scripts/postgres/1-create-schema.sql first, then this file, on an EMPTY database.',
         `-- Created ${new Date().toISOString()} from ${process.env.SUPABASE_URL.replace('https://', '')}`, '', 'BEGIN;', ''];
     const expected = [];
     console.log('Reading from Supabase...');
@@ -119,10 +119,10 @@ async function main() {
     if (SUPABASE_URL) console.log(`Source project:  ${SUPABASE_URL.replace(/^https?:\/\//, '')}`);
     console.log(DRY_RUN ? 'Mode: DRY RUN, nothing will be written\n' : '');
 
-    const schemaSql = fs.readFileSync(path.join(__dirname, '..', 'postgresql-schema.sql'), 'utf8');
+    const schemaSql = fs.readFileSync(path.join(__dirname, 'postgres', '1-create-schema.sql'), 'utf8');
 
     if (SCHEMA_ONLY) {
-        if (DRY_RUN) { console.log('Would create the tables from postgresql-schema.sql.'); return pool.end(); }
+        if (DRY_RUN) { console.log('Would create the tables from scripts/postgres/1-create-schema.sql.'); return pool.end(); }
         await pool.query(schemaSql);
         console.log('Tables created (existing tables were left alone).');
         return pool.end();

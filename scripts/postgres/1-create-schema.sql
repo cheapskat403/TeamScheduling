@@ -1,6 +1,6 @@
 -- PostgreSQL Schema for Office Booking System (plain PostgreSQL, e.g. Azure Database for PostgreSQL)
 -- Same tables as supabase-schema.sql, without the Supabase-only parts (RLS, anon/authenticated roles).
--- Usage: psql "$DATABASE_URL" -f postgresql-schema.sql   (or: node scripts/migrate-supabase-to-postgres.js --schema-only)
+-- Usage: psql "$DATABASE_URL" -f scripts/postgres/1-create-schema.sql   (or: node scripts/migrate-supabase-to-postgres.js --schema-only)
 
 -- ============================================
 -- LOCATIONS TABLE
