@@ -505,7 +505,7 @@ Set these in the Render dashboard under **Environment**:
 - Ensure `User.Read.All` and `Directory.Read.All` are granted
 
 **No managers in dropdown**
-- Go to Settings → Team Roles and select allowed job titles
+- Go to Settings → Access & Roles and switch on "Lead teams & Calendar bookings" for the allowed job titles
 - Verify users have job titles set in Azure AD
 
 ### Database Issues

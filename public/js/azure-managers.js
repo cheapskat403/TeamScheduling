@@ -13,7 +13,7 @@ let rolesLoaded = false;
 /**
  * Load team roles from the database
  */
-async function loadTeamRoles() {
+export async function loadTeamRoles() {
     if (rolesLoaded) return;
     
     try {
@@ -64,176 +64,11 @@ export async function setAllowedTeamRoles(roles) {
 }
 
 /**
- * Initialize team roles view
+ * Keep the in-memory list in step after the Access page saved the roles itself
  */
-export async function initTeamRolesView() {
-    await loadTeamRoles();
-    await renderJobTitlesList();
-    renderAllowedRolesList();
-}
-
-// Store all job titles from Azure AD
-let allJobTitles = [];
-
-/**
- * Render available job titles from Azure AD
- */
-export async function renderJobTitlesList() {
-    const container = document.getElementById('jobTitlesList');
-    if (!container) {
-        console.error('jobTitlesList container not found');
-        return;
-    }
-    
-    container.innerHTML = '<div class="loading-row"><div class="loading-spinner"></div><span>Loading job titles from Azure AD...</span></div>';
-    
-    try {
-        if (typeof fetchAllJobTitles !== 'function') {
-            container.innerHTML = '<p class="error">Azure AD not available. Please sign in with Azure AD first.</p>';
-            return;
-        }
-        
-        allJobTitles = await fetchAllJobTitles();
-        
-        if (!allJobTitles || allJobTitles.length === 0) {
-            container.innerHTML = '<p class="no-data">No job titles found in Azure AD.</p>';
-            return;
-        }
-        
-        renderAvailableTitles();
-        
-    } catch (error) {
-        console.error('Error loading job titles:', error);
-        container.innerHTML = '<p class="error">Failed to load job titles from Azure AD.</p>';
-    }
-}
-
-/**
- * Render only available (unselected) titles
- */
-function renderAvailableTitles() {
-    const container = document.getElementById('jobTitlesList');
-    if (!container) return;
-    
-    // Filter out already selected roles
-    const availableTitles = allJobTitles.filter(title => !allowedTeamRoles.includes(title));
-    
-    if (availableTitles.length === 0) {
-        container.innerHTML = '<p class="no-data">All job titles have been added to allowed roles.</p>';
-        return;
-    }
-    
-    container.innerHTML = availableTitles.map(title => `
-        <div class="job-title-item" data-role="${escapeHtml(title)}">
-            <span>${escapeHtml(title)}</span>
-            <button class="add-role-btn" title="Add to allowed roles">
-                <span class="btn-text">+</span>
-                <span class="btn-spinner-small"></span>
-            </button>
-        </div>
-    `).join('');
-
-    // One listener for the list; the job title is read from data-role, never built into script text
-    container.onclick = (event) => {
-        const item = event.target.closest('.job-title-item');
-        if (item && container.contains(item)) toggleTeamRole(item.dataset.role, item);
-    };
-}
-
-/**
- * Render currently allowed roles
- */
-export function renderAllowedRolesList() {
-    const container = document.getElementById('allowedRolesList');
-    if (!container) return;
-    
-    if (allowedTeamRoles.length === 0) {
-        container.innerHTML = '<p class="no-data">No roles selected. Click on job titles from the left to add them.</p>';
-        return;
-    }
-    
-    // Sort alphabetically
-    const sortedRoles = [...allowedTeamRoles].sort((a, b) => a.localeCompare(b));
-    
-    container.innerHTML = sortedRoles.map(role => `
-        <div class="allowed-role-item" data-role="${escapeHtml(role)}">
-            <span>${escapeHtml(role)}</span>
-            <button class="remove-role-btn" title="Remove">
-                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-                <span class="btn-spinner-small"></span>
-            </button>
-        </div>
-    `).join('');
-
-    container.onclick = (event) => {
-        const button = event.target.closest('.remove-role-btn');
-        const item = button && button.closest('.allowed-role-item');
-        if (item && container.contains(item)) toggleTeamRole(item.dataset.role, item);
-    };
-}
-
-// Track saving state to prevent double-clicks
-let isSaving = false;
-
-/**
- * Toggle a team role with animation
- */
-export async function toggleTeamRole(title, element) {
-    // Prevent double-clicks
-    if (isSaving) return;
-    isSaving = true;
-    
-    // Add saving animation to the element
-    if (element) {
-        element.classList.add('saving');
-    }
-    
-    const isAdding = !allowedTeamRoles.includes(title);
-    const idx = allowedTeamRoles.indexOf(title);
-    
-    if (idx === -1) {
-        allowedTeamRoles.push(title);
-    } else {
-        allowedTeamRoles.splice(idx, 1);
-    }
-    
-    try {
-        await setAllowedTeamRoles(allowedTeamRoles);
-        
-        // Add success animation before removing
-        if (element) {
-            element.classList.remove('saving');
-            element.classList.add('success');
-            
-            // Animate out
-            await new Promise(r => setTimeout(r, 300));
-        }
-        
-        renderAvailableTitles();
-        renderAllowedRolesList();
-        
-        // Show subtle toast
-        showToast(isAdding ? `Added "${title}" as team lead role` : `Removed "${title}" from team lead roles`, 'success');
-    } catch (error) {
-        // Revert on error
-        if (idx === -1) {
-            allowedTeamRoles.pop();
-        } else {
-            allowedTeamRoles.splice(idx, 0, title);
-        }
-        
-        if (element) {
-            element.classList.remove('saving');
-            element.classList.add('error');
-            await new Promise(r => setTimeout(r, 500));
-            element.classList.remove('error');
-        }
-    } finally {
-        isSaving = false;
-    }
+export function cacheAllowedTeamRoles(roles) {
+    allowedTeamRoles = roles;
+    rolesLoaded = true;
 }
 
 /**
@@ -295,7 +130,7 @@ export async function openManagerSelector() {
             dropdown.innerHTML = `
                 <div class="dropdown-empty">
                     <p>No team lead roles configured.</p>
-                    <p class="hint">Go to Settings → Team Roles to select which job titles can lead teams.</p>
+                    <p class="hint">Go to Settings → Access to choose which job titles can lead teams.</p>
                 </div>
             `;
         } else {

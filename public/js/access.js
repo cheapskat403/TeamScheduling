@@ -1,57 +1,45 @@
 /**
- * Access page (admins only): who the admins are, and which job titles may read the audit log.
- * Calendar bookings use the Team Roles list, which has its own page.
+ * Access & Roles page (admins only).
+ *  - Admins: who they are (emails).
+ *  - Job title permissions: for each Azure AD job title, can they lead teams and make Calendar bookings
+ *    (the "team_roles" setting), and can they read the audit log ("audit_viewer_roles")?
  */
 
 import { escapeHtml, showToast } from './utils.js';
 import { apiGet, apiPut } from './fetch-utils.js';
+import { cacheAllowedTeamRoles } from './azure-managers.js';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const LEAD = 'team_roles';
+const AUDIT = 'audit_viewer_roles';
+
 let admins = [];
-let auditRoles = [];
+const roles = { [LEAD]: [], [AUDIT]: [] };   // job titles chosen for each permission
+let azureTitles = [];
+let order = [];                              // titles in display order (selected first, then A-Z), kept stable while toggling
 let wired = false;
+const saveQueue = { [LEAD]: Promise.resolve(), [AUDIT]: Promise.resolve(), admin_emails: Promise.resolve() };
 
 const el = (id) => document.getElementById(id);
+const norm = (title) => String(title).trim().replace(/\s+/g, ' ').toLowerCase();
+const has = (key, title) => roles[key].some(t => norm(t) === norm(title));
 
-async function save(key, list) {
-    await apiPut(`/api/settings/${key}`, { value: list });
+/** Saves one setting; saves of the same setting run one after another so the last click wins */
+function save(key, list) {
+    const run = () => apiPut(`/api/settings/${key}`, { value: list });
+    saveQueue[key] = saveQueue[key].then(run, run);
+    return saveQueue[key];
 }
 
-function chips(containerId, items, removeAttr, emptyText) {
-    const box = el(containerId);
+// ------------------------------------------------------------------ admins
+
+function renderAdmins() {
+    const box = el('adminList');
     if (!box) return;
-    box.innerHTML = items.length
-        ? items.map((item, i) => `<div class="allowed-role-item"><span>${escapeHtml(item)}</span>
-            <button type="button" class="btn-icon danger" ${removeAttr}="${i}" title="Remove" aria-label="Remove ${escapeHtml(item)}">&times;</button></div>`).join('')
-        : `<p class="empty-state">${emptyText}</p>`;
-}
-
-function render() {
-    chips('adminList', admins, 'data-remove-admin', 'No admins saved here. Admins set on the server (ADMIN_EMAILS) are not listed.');
-    chips('auditRoleList', auditRoles, 'data-remove-audit-role', 'No job titles selected. Only admins can read the audit log.');
-}
-
-async function loadTeamRoles() {
-    const box = el('calendarRoleList');
-    if (!box) return;
-    try {
-        const { value } = await apiGet('/api/settings/team_roles');
-        const roles = Array.isArray(value) ? value : [];
-        box.innerHTML = roles.length
-            ? roles.map(r => `<div class="allowed-role-item"><span>${escapeHtml(r)}</span></div>`).join('')
-            : '<p class="empty-state">No job titles selected, so only admins can make Calendar bookings.</p>';
-    } catch (error) {
-        box.innerHTML = '<p class="empty-state">Could not load this list.</p>';
-    }
-}
-
-async function loadJobTitleChoices() {
-    const list = el('auditRoleChoices');
-    if (!list || typeof window.fetchAllJobTitles !== 'function') return;
-    try {
-        const titles = await window.fetchAllJobTitles();
-        list.innerHTML = titles.map(t => `<option value="${escapeHtml(t)}"></option>`).join('');
-    } catch (error) { /* typing a title still works */ }
+    box.innerHTML = admins.length
+        ? admins.map((email, i) => `<div class="admin-chip"><span>${escapeHtml(email)}</span>
+            <button type="button" data-remove-admin="${i}" title="Remove" aria-label="Remove ${escapeHtml(email)}">&times;</button></div>`).join('')
+        : '<p class="empty-state">No admins saved here yet.</p>';
 }
 
 async function addAdmin() {
@@ -64,64 +52,138 @@ async function addAdmin() {
         await save('admin_emails', next);
         admins = next;
         input.value = '';
-        render();
+        renderAdmins();
         showToast('Admin added');
     } catch (error) {
         showToast(`Could not save: ${error.message}`, 'error');
     }
 }
 
-async function addAuditRole() {
-    const input = el('auditRoleInput');
-    const title = input.value.trim();
-    if (!title) return;
-    if (auditRoles.some(r => r.toLowerCase() === title.toLowerCase())) return showToast('Already added', 'error');
+async function removeAdmin(index) {
+    const next = admins.filter((_, i) => i !== index);
     try {
-        const next = [...auditRoles, title];
-        await save('audit_viewer_roles', next);
-        auditRoles = next;
-        input.value = '';
-        render();
-        showToast('Job title added');
+        await save('admin_emails', next);
+        admins = next;
+        renderAdmins();
     } catch (error) {
         showToast(`Could not save: ${error.message}`, 'error');
     }
 }
 
-async function removeFrom(key, list, index) {
-    const next = list.filter((_, i) => i !== index);
+// ------------------------------------------------------------------ job title permissions
+
+function allTitles() {
+    const seen = new Map();
+    [...azureTitles, ...roles[LEAD], ...roles[AUDIT]].forEach(t => { if (!seen.has(norm(t))) seen.set(norm(t), t); });
+    return [...seen.values()];
+}
+
+function sortTitles() {
+    order = allTitles().sort((a, b) => {
+        const sa = has(LEAD, a) || has(AUDIT, a) ? 0 : 1;
+        const sb = has(LEAD, b) || has(AUDIT, b) ? 0 : 1;
+        return sa - sb || a.localeCompare(b);
+    });
+}
+
+function renderRows() {
+    const body = el('permRows');
+    if (!body) return;
+    const query = norm(el('permSearch')?.value || '');
+    const onlySelected = !!el('permOnlySelected')?.checked;
+
+    const shown = order.filter(t => (!query || norm(t).includes(query)) && (!onlySelected || has(LEAD, t) || has(AUDIT, t)));
+    body.innerHTML = shown.length
+        ? shown.map(t => `<tr>
+            <td>${escapeHtml(t)}</td>
+            <td class="perm-col">${switchHtml(LEAD, t, 'Lead teams and Calendar bookings')}</td>
+            <td class="perm-col">${switchHtml(AUDIT, t, 'Read the audit log')}</td>
+        </tr>`).join('')
+        : `<tr><td colspan="3" class="empty-state">${order.length ? 'No job titles match.' : 'No job titles to show. Sign in with Azure AD and press Refresh.'}</td></tr>`;
+
+    renderSummary();
+}
+
+function switchHtml(key, title, label) {
+    return `<label class="switch"><input type="checkbox" data-key="${key}" data-title="${escapeHtml(title)}" ${has(key, title) ? 'checked' : ''} aria-label="${escapeHtml(label)}: ${escapeHtml(title)}"><span class="switch-track"></span></label>`;
+}
+
+async function togglePermission(input) {
+    const { key, title } = input.dataset;
+    const wanted = input.checked;
+    const previous = roles[key];
+    const next = wanted ? [...previous, title] : previous.filter(t => norm(t) !== norm(title));
+
+    roles[key] = next;
+    input.disabled = true;
     try {
         await save(key, next);
-        return next;
+        if (key === LEAD) cacheAllowedTeamRoles(next);
+        renderSummary();
     } catch (error) {
+        roles[key] = previous;
+        input.checked = !wanted;
         showToast(`Could not save: ${error.message}`, 'error');
-        return list;
+    } finally {
+        input.disabled = false;
     }
 }
+
+function renderSummary() {
+    el('permSummary').textContent =
+        `${roles[LEAD].length} job title${roles[LEAD].length === 1 ? '' : 's'} can lead teams and make Calendar bookings; ` +
+        `${roles[AUDIT].length} can read the audit log.`;
+}
+
+async function loadAzureTitles() {
+    if (typeof window.fetchAllJobTitles !== 'function') return [];
+    try { return await window.fetchAllJobTitles(); } catch (error) { return []; }
+}
+
+async function refreshTitles() {
+    const button = el('permRefresh');
+    if (button) button.disabled = true;
+    azureTitles = await loadAzureTitles();
+    sortTitles();
+    renderRows();
+    if (button) button.disabled = false;
+}
+
+// ------------------------------------------------------------------ page
 
 export async function initAccessView() {
     if (!wired) {
         wired = true;
         el('adminAdd')?.addEventListener('click', addAdmin);
         el('adminEmail')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addAdmin(); } });
-        el('auditRoleAdd')?.addEventListener('click', addAuditRole);
-        el('auditRoleInput')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addAuditRole(); } });
-        el('adminList')?.addEventListener('click', async (e) => {
+        el('adminList')?.addEventListener('click', (e) => {
             const btn = e.target.closest('[data-remove-admin]');
-            if (btn) { admins = await removeFrom('admin_emails', admins, Number(btn.dataset.removeAdmin)); render(); }
+            if (btn) removeAdmin(Number(btn.dataset.removeAdmin));
         });
-        el('auditRoleList')?.addEventListener('click', async (e) => {
-            const btn = e.target.closest('[data-remove-audit-role]');
-            if (btn) { auditRoles = await removeFrom('audit_viewer_roles', auditRoles, Number(btn.dataset.removeAuditRole)); render(); }
+        el('permSearch')?.addEventListener('input', renderRows);
+        el('permOnlySelected')?.addEventListener('change', renderRows);
+        el('permRefresh')?.addEventListener('click', refreshTitles);
+        el('permRows')?.addEventListener('change', (e) => {
+            if (e.target.matches('input[data-key]')) togglePermission(e.target);
         });
     }
+
     try {
-        admins = (await apiGet('/api/settings/admin_emails')).value || [];
-        auditRoles = (await apiGet('/api/settings/audit_viewer_roles')).value || [];
+        const [adminSetting, leadSetting, auditSetting] = await Promise.all([
+            apiGet('/api/settings/admin_emails'), apiGet(`/api/settings/${LEAD}`), apiGet(`/api/settings/${AUDIT}`)
+        ]);
+        admins = adminSetting.value || [];
+        roles[LEAD] = Array.isArray(leadSetting.value) ? leadSetting.value : [];
+        roles[AUDIT] = Array.isArray(auditSetting.value) ? auditSetting.value : [];
+        cacheAllowedTeamRoles(roles[LEAD]);
     } catch (error) {
         showToast(`Could not load access settings: ${error.message}`, 'error');
     }
-    render();
-    loadTeamRoles();
-    loadJobTitleChoices();
+
+    renderAdmins();
+    sortTitles();
+    renderRows();            // show what is already chosen straight away
+    azureTitles = await loadAzureTitles();
+    sortTitles();
+    renderRows();
 }

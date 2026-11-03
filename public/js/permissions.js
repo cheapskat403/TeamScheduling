@@ -58,7 +58,7 @@ export const canBookCalendar = () => !!current.canBookCalendar;
 export const canViewAudit = () => !!current.canViewAudit;
 
 /** Views only some people may open (the server also refuses their data) */
-export const ADMIN_VIEWS = ['teams', 'teamRoles', 'locations', 'holidays', 'access'];
+export const ADMIN_VIEWS = ['teams', 'locations', 'holidays', 'access'];
 export function canOpenView(viewName) {
     if (ADMIN_VIEWS.includes(viewName)) return isAdmin();
     if (viewName === 'audit') return canViewAudit();

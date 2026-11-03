@@ -15,6 +15,9 @@ import { initAccessView } from './access.js';
 let floorPlanModuleLoading = false;
 let floorPlanModuleLoaded = false;
 
+// Pages that were merged into another, so old bookmarks and remembered pages still land somewhere sensible
+const LEGACY_VIEWS = { teamRoles: 'access' };
+
 // Track current view for cleanup
 let currentView = 'calendar';
 
@@ -22,6 +25,8 @@ let currentView = 'calendar';
  * Switch to a different view
  */
 export async function switchView(viewName, { updateUrl = true } = {}) {
+    viewName = LEGACY_VIEWS[viewName] || viewName;
+
     // Pages only some people may open (the server refuses their data as well)
     if (!canOpenView(viewName)) {
         viewName = 'calendar';
@@ -86,10 +91,6 @@ export async function switchView(viewName, { updateUrl = true } = {}) {
             await loadFloorPlanModule();
             break;
             
-        case 'teamRoles':
-            window.initTeamRolesView?.();
-            break;
-
         case 'audit':
             initAuditView();
             break;
@@ -152,6 +153,7 @@ async function loadFloorPlanModule() {
 export function viewFromHash() {
     let name = '';
     try { name = decodeURIComponent(location.hash.replace(/^#\/?/, '')); } catch (e) { return null; }
+    name = LEGACY_VIEWS[name] || name;
     return name && document.getElementById(`${name}View`)?.classList.contains('view') ? name : null;
 }
 
@@ -160,7 +162,8 @@ export function savedView() {
     const fromHash = viewFromHash();
     if (fromHash) return fromHash;
     try {
-        const name = sessionStorage.getItem('currentView');
+        const stored = sessionStorage.getItem('currentView');
+        const name = LEGACY_VIEWS[stored] || stored;
         return name && document.getElementById(`${name}View`)?.classList.contains('view') ? name : null;
     } catch (e) {
         return null;

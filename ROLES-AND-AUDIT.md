@@ -12,10 +12,10 @@
 | See everything (read only) | yes | yes | yes |
 
 - **Admins** are the emails in the `ADMIN_EMAILS` setting on the host (comma separated), plus the list admins keep
-  on the **Settings > Access** page. `ADMIN_EMAILS` always applies, so you cannot lock yourself out by editing the list.
-- **Team lead roles** are the Azure AD job titles chosen on **Settings > Team Roles**. The same list decides who can make
+  on the **Settings > Access & Roles** page. `ADMIN_EMAILS` always applies, so you cannot lock yourself out by editing the list.
+- **Team lead roles** are the Azure AD job titles chosen on **Settings > Access & Roles** (the "Lead teams & Calendar bookings" switch). The same switch decides who can make
   Calendar bookings. Matching ignores upper/lower case and extra spaces.
-- **Audit log readers** are admins plus the job titles chosen on **Settings > Access**.
+- **Audit log readers** are admins plus the job titles with the "Audit log" switch on **Settings > Access & Roles**.
 
 ## How the server knows a job title
 
@@ -34,7 +34,7 @@ Roles are only enforced when `REQUIRE_AUTH=true` (without logins there is nobody
 2. Add the audit table to any database created before this feature: run `scripts/postgres/4-add-audit-log.sql` (new databases
    already get it from `1-create-schema.sql`). Without the table the app still works, but nothing is recorded and the error is
    logged.
-3. Check **Settings > Team Roles** lists the job titles who should make Calendar bookings. Anyone else loses that ability.
+3. Check the "Lead teams & Calendar bookings" switches on **Settings > Access & Roles** for the job titles that should make Calendar bookings. Anyone else loses that ability.
 
 ## Audit log
 

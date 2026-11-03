@@ -37,7 +37,7 @@ import {
 import { addToOutlookCalendar, downloadICS } from './calendar-sync.js';
 import { switchView, setupSettingsSubmenu, toggleMobileMenu, closeMobileMenu, savedView, viewFromHash } from './views.js';
 import { 
-    initTeamRolesView, toggleTeamRole, openManagerSelector, 
+    openManagerSelector, 
     closeManagerDropdown, selectManager 
 } from './azure-managers.js';
 import { formatDateStr, showToast } from './utils.js';
@@ -154,11 +154,6 @@ function setupEventListeners() {
     document.getElementById('selectManagerBtn')?.addEventListener('click', (e) => {
         e.stopPropagation();
         openManagerSelector();
-    });
-    
-    // Team Roles refresh button
-    document.getElementById('refreshRolesBtn')?.addEventListener('click', () => {
-        initTeamRolesView();
     });
     
     // Modal close on background click
@@ -308,8 +303,6 @@ window.downloadICS = downloadICS;
 window.switchView = switchView;
 
 // Azure AD
-window.initTeamRolesView = initTeamRolesView;
-window.toggleTeamRole = toggleTeamRole;
 window.openManagerSelector = openManagerSelector;
 window.selectManager = selectManager;
 
