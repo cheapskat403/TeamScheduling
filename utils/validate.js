@@ -193,6 +193,19 @@ function settingValue(key, value) {
         return value.map(v => str(100)(v, 'team_roles item'));
     }
 
+    if (key === 'admin_emails') {
+        if (!Array.isArray(value)) fail('admin_emails must be an array');
+        if (value.length > 200) fail('admin_emails can have at most 200 items');
+        return [...new Set(value.map(v => email(v, 'admin_emails item').toLowerCase()))];
+    }
+
+    if (key === 'audit_viewer_roles') {
+        if (!Array.isArray(value)) fail('audit_viewer_roles must be an array');
+        if (!value.every(v => typeof v === 'string')) fail('audit_viewer_roles must be an array of strings');
+        if (value.length > 200) fail('audit_viewer_roles can have at most 200 items');
+        return value.map(v => str(100)(v, 'audit_viewer_roles item'));
+    }
+
     if (key.startsWith('floorplan_bg_')) {
         const ok = value && typeof value === 'object' && !Array.isArray(value)
             && typeof value.url === 'string' && FLOORPLAN_FILE.test(value.url)

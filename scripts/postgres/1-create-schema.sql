@@ -135,6 +135,27 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ============================================
+-- AUDIT LOG (every change made through the app, and every refused attempt)
+-- ============================================
+CREATE TABLE IF NOT EXISTS audit_log (
+    id BIGSERIAL PRIMARY KEY,
+    at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    actor_email TEXT,                          -- who did it (NULL when logins are not enforced)
+    actor_name TEXT,
+    actor_id TEXT,
+    action TEXT NOT NULL,                      -- create, update, delete, check-in
+    entity TEXT,                               -- bookings, teams, desks, settings ...
+    entity_id TEXT,
+    outcome TEXT NOT NULL DEFAULT 'success',   -- success, denied (not allowed) or failed
+    status INTEGER,                            -- HTTP status of the answer
+    details JSONB                              -- the request, cut down (no photos or QR codes)
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_at ON audit_log(at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_log_actor ON audit_log(actor_email);
+CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity, entity_id);
+
 -- No GRANT statements: run this as the application's own database user, which then owns the tables.
 -- Row Level Security is a Supabase feature and is not used here; access is controlled by the database
 -- user's credentials and the network firewall.

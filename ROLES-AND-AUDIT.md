@@ -1,0 +1,46 @@
+# Roles and audit log
+
+## Who can do what
+
+| | Admin | Team lead roles | Everyone else (signed in) |
+| --- | --- | --- | --- |
+| Change teams, locations, holidays, desk layout, settings | yes | no | no |
+| Make, change, delete Calendar (team) bookings | yes | yes | no |
+| Book desks, cancel their own desk bookings | yes | yes | yes |
+| Cancel anyone's desk booking | yes | no | no |
+| Read the audit log | yes | if their job title is chosen | if their job title is chosen |
+| See everything (read only) | yes | yes | yes |
+
+- **Admins** are the emails in the `ADMIN_EMAILS` setting on the host (comma separated), plus the list admins keep
+  on the **Settings > Access** page. `ADMIN_EMAILS` always applies, so you cannot lock yourself out by editing the list.
+- **Team lead roles** are the Azure AD job titles chosen on **Settings > Team Roles**. The same list decides who can make
+  Calendar bookings. Matching ignores upper/lower case and extra spaces.
+- **Audit log readers** are admins plus the job titles chosen on **Settings > Access**.
+
+## How the server knows a job title
+
+The job title is not in the login token, so the browser sends its own Microsoft Graph token (header `X-Graph-Token`) to
+`/api/me` and the server asks Graph who that token belongs to. It only accepts the title when the token belongs to the same
+person as the verified login, so nobody can borrow someone else's title. The token is not stored. The server remembers the
+title for 30 minutes; the page refreshes it every 10 minutes, and if the server has forgotten (a restart), the first refused
+request makes the page send it again and retry. A person with no job title in Azure AD has no role-based access.
+
+## Turning it on
+
+Roles are only enforced when `REQUIRE_AUTH=true` (without logins there is nobody to check). Before you deploy with that:
+
+1. Set `ADMIN_EMAILS` on the host to at least your own email. With it empty, only admins saved in the app could change settings,
+   and nobody is saved yet.
+2. Add the audit table to any database created before this feature: run `scripts/postgres/4-add-audit-log.sql` (new databases
+   already get it from `1-create-schema.sql`). Without the table the app still works, but nothing is recorded and the error is
+   logged.
+3. Check **Settings > Team Roles** lists the job titles who should make Calendar bookings. Anyone else loses that ability.
+
+## Audit log
+
+Every change made through the API is recorded: who, what (area and id), when, the result, and the request cut down for
+storage. Refused attempts are recorded too, as "Not allowed". It is written after the response, so it never slows or breaks a
+request; if writing fails the error is only logged. Photos, QR codes, tokens and similar fields are never stored, long text is
+shortened and each entry is size-capped. Reads (viewing pages) are not recorded. Nothing is deleted automatically.
+
+The server does not record the previous value of a changed item, only the request that changed it.

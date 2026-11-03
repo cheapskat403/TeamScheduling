@@ -140,9 +140,9 @@ router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Signed-in users can only cancel their own bookings
+        // Signed-in users can only cancel their own bookings (admins can cancel anyone's)
         const email = callerEmail(req);
-        if (email) {
+        if (email && !(req.permissions && req.permissions.isAdmin)) {
             const { data: existing } = await supabase
                 .from('desk_bookings')
                 .select('employee_email')

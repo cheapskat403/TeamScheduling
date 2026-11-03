@@ -135,6 +135,27 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 -- ============================================
+-- AUDIT LOG (every change made through the app, and every refused attempt)
+-- ============================================
+CREATE TABLE IF NOT EXISTS audit_log (
+    id BIGSERIAL PRIMARY KEY,
+    at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    actor_email TEXT,                          -- who did it (NULL when logins are not enforced)
+    actor_name TEXT,
+    actor_id TEXT,
+    action TEXT NOT NULL,                      -- create, update, delete, check-in
+    entity TEXT,                               -- bookings, teams, desks, settings ...
+    entity_id TEXT,
+    outcome TEXT NOT NULL DEFAULT 'success',   -- success, denied (not allowed) or failed
+    status INTEGER,                            -- HTTP status of the answer
+    details JSONB                              -- the request, cut down (no photos or QR codes)
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_at ON audit_log(at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_log_actor ON audit_log(actor_email);
+CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity, entity_id);
+
+-- ============================================
 -- ROW LEVEL SECURITY
 -- ============================================
 -- The app talks to the database with the SECRET (service_role) key, which is not limited by row level
@@ -149,3 +170,4 @@ ALTER TABLE desks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE desk_bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE floor_elements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;

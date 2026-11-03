@@ -34,10 +34,15 @@ const desksRoutes = require('./routes/desks');
 const floorElementsRoutes = require('./routes/floorElements');
 const deskBookingsRoutes = require('./routes/deskBookings');
 const settingsRoutes = require('./routes/settings');
+const meRoutes = require('./routes/me');
+const auditRoutes = require('./routes/audit');
 
 // Import middleware
 const { authenticate, optionalAuth } = require('./middleware/auth');
 const { requireLoginForApi } = require('./middleware/requireAuth');
+const { attachPermissions, requireAdmin, requireCalendarAccess, onWrites } = require('./middleware/permissions');
+const { auditWrites } = require('./middleware/audit');
+const { warnIfNoAdmins } = require('./utils/permissions');
 const { socketAuth } = require('./middleware/socketAuth');
 
 // Initialize Express app
@@ -145,18 +150,29 @@ if (process.env.REQUIRE_AUTH === 'true' && !(process.env.AZURE_AD_TENANT_ID && p
     logger.error('REQUIRE_AUTH=true but Azure AD is not configured: every API request will be refused');
 }
 
+// What the signed-in user may do (admin, Calendar bookings, audit log), and the audit trail of every change.
+// Roles are only enforced when REQUIRE_AUTH=true. See utils/permissions.js.
+app.use('/api', attachPermissions);
+app.use('/api', auditWrites);
+warnIfNoAdmins();
+
 // Data route (initial load)
 app.use('/api/data', dataRoutes);
 
-// Resource routes (each router also protects its own writes)
-app.use('/api/bookings', bookingsRoutes);
-app.use('/api/locations', locationsRoutes);
-app.use('/api/holidays', holidaysRoutes);
-app.use('/api/teams', teamsRoutes);
-app.use('/api/desks', desksRoutes);
-app.use('/api/floor-elements', floorElementsRoutes);
+app.use('/api/me', meRoutes);
+app.use('/api/audit', auditRoutes);
+
+// Resource routes (each router also protects its own writes).
+// Anyone signed in can read. Changing teams, locations, holidays, the desk layout and settings is for
+// admins; Calendar bookings need an allowed job title (or admin); desk bookings are open to everyone.
+app.use('/api/bookings', onWrites(requireCalendarAccess), bookingsRoutes);
+app.use('/api/locations', onWrites(requireAdmin), locationsRoutes);
+app.use('/api/holidays', onWrites(requireAdmin), holidaysRoutes);
+app.use('/api/teams', onWrites(requireAdmin), teamsRoutes);
+app.use('/api/desks', onWrites(requireAdmin), desksRoutes);
+app.use('/api/floor-elements', onWrites(requireAdmin), floorElementsRoutes);
 app.use('/api/desk-bookings', deskBookingsRoutes);
-app.use('/api/settings', settingsRoutes);
+app.use('/api/settings', onWrites(requireAdmin), settingsRoutes);
 
 // QR code check-in lookup (legacy path). Same handler as /api/desk-bookings/checkin/:qrCode, and the
 // only API read that works without logging in (see PUBLIC_READ_PATHS in middleware/requireAuth.js).
