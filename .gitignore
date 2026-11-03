@@ -10,3 +10,7 @@ backups/
 data.sql
 *-export.sql
 scripts/postgres/2-load-data.sql
+
+# Browser test output
+test-results/
+playwright-report/

@@ -108,7 +108,7 @@ app.use(helmet({
 // Rate limiting for API endpoints
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 200, // Limit each IP to 200 requests per windowMs
+    max: parseInt(process.env.RATE_LIMIT_MAX, 10) || 200, // Limit each IP to this many requests per windowMs (RATE_LIMIT_MAX overrides it)
     message: { error: 'Too many requests, please try again later.' },
     standardHeaders: true,
     legacyHeaders: false,

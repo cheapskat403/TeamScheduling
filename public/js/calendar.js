@@ -146,7 +146,7 @@ function renderCalendarGrid(year, month, monthBookings, capacity, today, isLoadi
         const dropHandlers = !isWeekend && !holiday && canBookCalendar() ? 
             `ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${dateStr}')"` : '';
         
-        html += `<div class="${classes.join(' ')}" onclick="openBookingModal('${dateStr}')" ${dropHandlers}>${dayContent}</div>`;
+        html += `<div class="${classes.join(' ')}" data-date="${dateStr}" onclick="openBookingModal('${dateStr}')" ${dropHandlers}>${dayContent}</div>`;
     }
     
     // Remove skeleton class and set content
