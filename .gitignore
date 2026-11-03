@@ -5,3 +5,7 @@ node_modules/
 coverage/
 
 backups/
+
+# Data exports (contain real data)
+data.sql
+*-export.sql

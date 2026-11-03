@@ -12,6 +12,10 @@
  *   node scripts/migrate-supabase-to-postgres.js                create tables if missing and copy; refuses when
  *                                                               the target already holds data
  *   node scripts/migrate-supabase-to-postgres.js --replace      same, but empties the target tables first
+ *   node scripts/migrate-supabase-to-postgres.js --export-sql=data.sql
+ *                                                               no target needed: read Supabase and write a SQL file
+ *                                                               of the data, to run by hand on any machine that can
+ *                                                               reach the database (see POSTGRESQL-MIGRATION.md)
  *
  * Secrets are never printed. Only the target host and database name are shown so you can check them.
  */
@@ -39,9 +43,11 @@ const args = new Set(process.argv.slice(2));
 const DRY_RUN = args.has('--dry-run');
 const SCHEMA_ONLY = args.has('--schema-only');
 const REPLACE = args.has('--replace');
+const EXPORT_FILE = (process.argv.find(a => a.startsWith('--export-sql=')) || '').slice('--export-sql='.length);
 
 const fail = message => { console.error(`\nERROR: ${message}`); process.exit(1); };
-const q = name => `"${name.replace(/"/g, '""')}"`;
+const NL = String.fromCharCode(10);
+const q = name =>`"${name.replace(/"/g, '""')}"`;
 
 async function readSource(supabase, table) {
     const rows = [];
@@ -70,9 +76,42 @@ async function insertRows(client, table, rows) {
     }
 }
 
+function literal(table, column, value) {
+    if (value === null || value === undefined) return 'NULL';
+    if ((JSONB_COLUMNS[table] || []).includes(column)) return `'${JSON.stringify(value).replace(/'/g, "''")}'::jsonb`;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+// Writes the data as a plain SQL script: one transaction, parents first, then a count of every table.
+async function exportSql(supabase, file) {
+    const out = ['-- Data export from Supabase. Run postgresql-schema.sql first, then this file, on an EMPTY database.',
+        `-- Created ${new Date().toISOString()} from ${process.env.SUPABASE_URL.replace('https://', '')}`, '', 'BEGIN;', ''];
+    const expected = [];
+    console.log('Reading from Supabase...');
+    for (const table of TABLES) {
+        const rows = await readSource(supabase, table);
+        console.log(`  ${table.name.padEnd(16)} ${rows.length} rows`);
+        expected.push(`${table.name} ${rows.length}`);
+        if (rows.length === 0) continue;
+        const columns = Object.keys(rows[0]);
+        for (let i = 0; i < rows.length; i += 200) {
+            const tuples = rows.slice(i, i + 200).map(r => `  (${columns.map(c => literal(table.name, c, r[c])).join(', ')})`);
+            out.push(`INSERT INTO ${q(table.name)} (${columns.map(q).join(', ')}) VALUES${NL}${tuples.join(',' + NL)};`, '');
+        }
+    }
+    out.push("SELECT setval(pg_get_serial_sequence('public_holidays', 'id'), COALESCE((SELECT MAX(id) FROM public_holidays), 0) + 1, false);", '',
+        `-- Row counts that should come out below: ${expected.join(', ')}`,
+        TABLES.map(t => `SELECT '${t.name}' AS table_name, COUNT(*) AS rows FROM ${q(t.name)}`).join(NL + 'UNION ALL ') + NL + 'ORDER BY 1;', '', 'COMMIT;', '');
+    fs.writeFileSync(file, out.join(NL), 'utf8');
+    console.log(`${NL}Wrote ${file}. It contains your data: keep it private and delete it when you are done.`);
+}
+
 async function main() {
     const { SUPABASE_URL, SUPABASE_SECRET_KEY } = process.env;
-    if (!SCHEMA_ONLY && (!SUPABASE_URL || !SUPABASE_SECRET_KEY)) fail('Set SUPABASE_URL and SUPABASE_SECRET_KEY for the source.');
+    if ((EXPORT_FILE || !SCHEMA_ONLY) && (!SUPABASE_URL || !SUPABASE_SECRET_KEY)) fail('Set SUPABASE_URL and SUPABASE_SECRET_KEY for the source.');
+
+    if (EXPORT_FILE) return exportSql(createClient(SUPABASE_URL, SUPABASE_SECRET_KEY), EXPORT_FILE);
 
     const { pool } = require('../config/postgres');
     const target = await pool.query('SELECT current_database() AS db');

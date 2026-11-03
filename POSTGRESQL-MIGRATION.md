@@ -32,6 +32,24 @@ To go back, set `DB_PROVIDER=supabase`. Anything written to the new database aft
 
 `node scripts/migrate-supabase-to-postgres.js --schema-only` just creates the empty tables.
 
+## Doing it by hand (when this machine cannot reach the database)
+
+Two plain SQL files, run on any machine or tool that can reach the database (`psql`, Azure's query tools, a jump host):
+
+1. `postgresql-schema.sql` creates the tables. It is safe to run twice.
+2. A data file made from Supabase. Create it anywhere that can reach Supabase (no target database needed):
+   `node scripts/migrate-supabase-to-postgres.js --export-sql=data.sql`
+   Run it on an **empty** database after step 1. It is one transaction, so a failure changes nothing, and it ends with a table of row
+   counts. The expected counts are written in a comment in the file. `data.sql` holds real data (names, emails, photos): it is
+   ignored by git, keep it private and delete it when done.
+
+With `psql`:
+
+```
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f postgresql-schema.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f data.sql
+```
+
 ## Not covered by the switch
 
 `scripts/setup-floor-plan.js` and `migrate-to-supabase.js` still talk to Supabase directly.
