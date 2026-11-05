@@ -1,538 +1,271 @@
-# 🏢 Office Booking System
+# Office Booking
 
-A modern, real-time web application for managing office space bookings, team schedules, and desk reservations with interactive floor plans and Azure AD integration.
+Digiata's web app for planning who is in the office. Team leads book their teams into an office on the **Calendar**,
+and people book individual desks on the **Desks** floor plan. Everyone signs in with their Microsoft work account.
 
-[![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Express](https://img.shields.io/badge/Express-4.x-000000?logo=express&logoColor=white)](https://expressjs.com/)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
-[![Azure AD](https://img.shields.io/badge/Azure%20AD-SSO-0078D4?logo=microsoft&logoColor=white)](https://azure.microsoft.com/)
-[![Socket.IO](https://img.shields.io/badge/Socket.IO-Real--time-010101?logo=socket.io&logoColor=white)](https://socket.io/)
-[![Test Coverage](https://img.shields.io/badge/Coverage-95%25-brightgreen)](coverage/)
+Node.js and Express on the server, PostgreSQL for data, Socket.IO for live updates, and plain JavaScript in the browser
+(no build step).
 
----
+- [What it does](#what-it-does)
+- [Running it locally](#running-it-locally)
+- [Configuration](#configuration)
+- [Azure AD app registration](#azure-ad-app-registration)
+- [Deploying](#deploying)
+- [Tests](#tests)
+- [How it is put together](#how-it-is-put-together)
+- [API](#api)
+- [Security](#security)
+- [Troubleshooting](#troubleshooting)
 
-## 📋 Table of Contents
+## What it does
 
-- [Features](#-features)
-- [Quick Start](#-quick-start)
-- [Configuration](#-configuration)
-- [Azure AD Setup](#-azure-ad-setup)
-- [Development](#-development)
-- [Architecture](#-architecture)
-- [API Reference](#-api-reference)
-- [Security](#-security)
-- [Deployment](#-deployment)
-- [Troubleshooting](#-troubleshooting)
-- [License](#-license)
+**Calendar (team bookings)**
+- A month view per office. Team leads book their team in for a day; each day shows the teams and how full the office is.
+- Warns when a booking would go over the office's capacity, and only allows it with a note explaining why.
+- Drag a booking to another day to move it.
+- South African public holidays are fetched from [Nager.Date](https://date.nager.at) and shown on the calendar.
+- Add a booking to Outlook, or download it as an `.ics` file.
 
----
+**Desks (desk bookings)**
+- A floor plan per office and floor, with the office drawing behind the desks.
+- One click books a free desk for the chosen day, and Undo takes it back. **Find me a desk** picks one next to teammates
+  who are in, or on the team's own seats.
+- Desk types: hot seat (anyone), team seat (reserved for a team; others are asked first), and unavailable.
+- One desk per person per day, and two people cannot book the same desk, even at the same moment.
+- Each desk has a QR code that opens a check-in page for it.
+- Admins can edit the layout: move desks, and add rooms, walls and labels.
 
-## ✨ Features
+**Live**
+- Bookings made by others appear without reloading.
+- The Calendar and Desks pages show who else is looking at them, and Desks warns when someone is editing the layout.
 
-### 🔐 Authentication & Security
-- **Azure AD Single Sign-On** — Sign in with Microsoft work accounts
-- **JWT Token Validation** — Backend verifies Azure AD tokens via JWKS
-- **Role-based Access** — Configurable team lead job titles
-- **Rate Limiting** — 1000 requests per 15 minutes per signed-in user (300 per IP when not signed in), with a 5000 per IP flood guard
-- **Security Headers** — Full CSP, HSTS, X-Frame-Options via Helmet
-- **XSS Protection** — HTML escaping on all user-generated content
+**Admin**
+- Teams, offices, public holidays, and **Settings > Access & Roles**: who is an admin, and which job titles can lead
+  teams and read the audit log.
+- An **Audit log** of every change: who, what, when and the details.
 
-### 📅 Team Scheduling
-- **Interactive Calendar** — Visual monthly grid with drag-and-drop rescheduling
-- **Multi-Location Support** — Multiple offices with addresses and capacity tracking
-- **Team Management** — Manager photos, member counts, custom colors
-- **Capacity Tracking** — Real-time warnings when approaching limits
-- **Public Holidays** — Auto-fetch South African holidays from Nager.Date API
-- **Calendar Export** — ICS files for Outlook, Google Calendar, Apple Calendar
+See [ROLES-AND-AUDIT.md](ROLES-AND-AUDIT.md) for exactly who can do what.
 
-### 🪑 Desk Booking & Floor Plans
-- **Visual Floor Plan Editor** — Drag-and-drop layout designer
-- **Room Elements** — Labeled boundaries with custom colors
-- **Desk Types** — Hotseat (anyone), Team Seat (reserved), Unavailable
-- **Time Slider** — Preview occupancy at any time of day
-- **QR Code Check-In** — Scan desk QR codes to confirm arrival
-- **Multi-Floor Support** — Switch between floors per location
+## Running it locally
 
-### 🔄 Real-Time Collaboration
-- **Live Presence** — See who's viewing the same calendar
-- **Instant Sync** — Bookings update across all clients via Socket.IO
-- **Optimistic Updates** — Immediate UI feedback before server confirms
-
-### 🎨 User Experience
-- **Dark/Light Theme** — Auto-detects system preference with manual toggle
-- **Responsive Design** — Desktop grid, mobile list, tablet-optimized
-- **Keyboard Shortcuts** — Arrow keys for month navigation
-- **Blueprint Floor Plans** — Professional architectural visualization
-- **Accessibility** — ARIA labels, roles, live regions, semantic HTML
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-| Requirement | Version | Purpose |
-|-------------|---------|---------|
-| [Node.js](https://nodejs.org/) | 18+ | Runtime |
-| [npm](https://www.npmjs.com/) | 9+ | Package manager |
-| [Supabase](https://supabase.com/) | Free tier | PostgreSQL database |
-| [Azure AD](https://portal.azure.com/) | Any tenant | Authentication |
-
-### Installation
+You need Node.js 20.19 or later and a PostgreSQL database (version 14 or later).
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/office-booking.git
-cd office-booking
-
-# Install dependencies
+git clone https://github.com/Digiata/DigiataOfficeBooking.git
+cd DigiataOfficeBooking
 npm install
 
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your credentials (see Configuration section)
+# Create the tables (safe to run more than once)
+psql "postgresql://user:password@localhost:5432/office_booking" -f scripts/postgres/1-create-schema.sql
+```
 
-# Initialize database
-# Run the contents of supabase-schema.sql in Supabase SQL Editor
+Create a `.env` file in the project folder (git ignores it):
 
-# Start development server
+```env
+DB_PROVIDER=postgres
+DATABASE_URL=postgresql://user:password@localhost:5432/office_booking
+DB_SSL=disable
+
+# Leave these two out to work without signing in
+AZURE_AD_CLIENT_ID=your-client-id
+AZURE_AD_TENANT_ID=your-tenant-id
+```
+
+Start the server (it restarts itself when you change a file) and open <http://localhost:3000>:
+
+```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Without the Azure AD settings nobody is signed in, which is fine for working on the pages, but roles are not enforced.
 
----
+## Configuration
 
-## ⚙️ Configuration
+All settings are environment variables. Locally they go in `.env`; on the host, set them in its settings.
 
-### Environment Variables
+**Database**
 
-Create a `.env` file in the project root:
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `DB_PROVIDER` | `supabase` | Set to `postgres`. The default dates from before the move to PostgreSQL, so always set it. |
+| `DATABASE_URL` | | Full connection string. Use this **or** the separate details below. |
+| `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_PORT` | `DB_PORT` 5432 | Connection details, instead of `DATABASE_URL`. |
+| `DB_SSL` | `require` | `require` (verifies the certificate), `no-verify`, or `disable` (local only). |
+| `DB_POOL_MAX` | 10 | Most database connections open at once. |
 
-```env
-# Supabase (Required)
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SECRET_KEY=your-service-role-key
+**Sign-in and access**
 
-# Azure AD (Required for authentication)
-AZURE_AD_CLIENT_ID=your-client-id
-AZURE_AD_TENANT_ID=your-tenant-id
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `AZURE_AD_CLIENT_ID` | | The app registration's Application (client) ID. |
+| `AZURE_AD_TENANT_ID` | | Your Directory (tenant) ID. |
+| `REQUIRE_AUTH` | off | `true` refuses every API request without a valid login and turns on roles. Use it in production. |
+| `ADMIN_EMAILS` | | Comma-separated emails that are always admins, whatever the in-app list says. Include your own. |
+| `CORS_ORIGINS` | none | Comma-separated other websites allowed to call the API. Not needed when the pages come from this server. |
 
-# Server (Optional)
-PORT=3000
-NODE_ENV=development
-```
+**Other**
 
-| Variable | Required | Description |
-|----------|:--------:|-------------|
-| `SUPABASE_URL` | ✅ | Your Supabase project URL |
-| `SUPABASE_SECRET_KEY` | ✅ | Supabase service role key (not anon key) |
-| `AZURE_AD_CLIENT_ID` | ✅ | Azure AD Application (client) ID |
-| `AZURE_AD_TENANT_ID` | ✅ | Azure AD Directory (tenant) ID |
-| `PORT` | ❌ | Server port (default: 3000) |
-| `NODE_ENV` | ❌ | `development` or `production` |
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `NODE_ENV` | | `production` in production: hides error details from users and quiets the logs. |
+| `PORT` | 3000 | Port the server listens on. |
+| `OFFICE_TIMEZONE` | `Africa/Johannesburg` | Decides what "today" is. |
+| `RATE_LIMIT_MAX` | 1000 | API requests per 15 minutes per signed-in person. |
+| `RATE_LIMIT_ANON_MAX` | 300 | API requests per 15 minutes per IP address, for requests without a login. |
+| `RATE_LIMIT_IP_MAX` | 5000 | API requests per 15 minutes per IP address, everyone together (a flood guard). |
 
-> ⚠️ **Security Note:** Never commit `.env` to version control. It's already in `.gitignore`.
+The app can still run on Supabase instead (`DB_PROVIDER=supabase` with `SUPABASE_URL` and `SUPABASE_SECRET_KEY`, schema in
+[supabase-schema.sql](supabase-schema.sql)). Production does not use it.
 
----
+## Azure AD app registration
 
-## 🔑 Azure AD Setup
+1. In the [Azure portal](https://portal.azure.com), go to **Microsoft Entra ID > App registrations > New registration**.
+   Name it, choose **single tenant**, and add a redirect URI of type **Single-page application (SPA)**.
+2. The redirect URI is the app's address followed by `/auth/callback`. Add one for each place it runs, for example:
+   - `http://localhost:3000/auth/callback`
+   - `https://booking.example.com/auth/callback`
+3. Under **API permissions**, add these Microsoft Graph **delegated** permissions, then **Grant admin consent**:
 
-### Step 1: Register Application
+   | Permission | Used for |
+   | --- | --- |
+   | `openid`, `profile`, `email` | Signing in |
+   | `User.Read` | The person's own profile, photo and job title |
+   | `User.Read.All` | Choosing team managers and showing people's photos |
+   | `Directory.Read.All` | Listing job titles on Access & Roles, and team sizes |
 
-1. Go to [Azure Portal](https://portal.azure.com) → **Azure Active Directory** → **App registrations**
-2. Click **+ New registration**
-3. Configure:
-   - **Name:** `Office Booking System`
-   - **Supported account types:** Single tenant
-   - **Redirect URI:** Select **Single-page application (SPA)** and enter:
-     - `http://localhost:3000` (for local development)
+4. From the registration's **Overview**, copy the Application (client) ID into `AZURE_AD_CLIENT_ID` and the Directory
+   (tenant) ID into `AZURE_AD_TENANT_ID`.
 
-### Step 2: Configure Redirect URIs
+Roles depend on job titles from Azure AD, so someone without a job title there gets no role-based access.
 
-After registration, go to **Authentication** and add all environments:
+## Deploying
 
-| Environment | Redirect URI |
-|-------------|--------------|
-| Local | `http://localhost:3000` |
-| Production | `https://your-app.onrender.com` |
-| Custom Domain | `https://booking.yourcompany.com` |
+Any host that runs Node.js 20.19 or later works.
 
-> **Important:** The redirect URI must match your actual domain exactly.
+1. Create the database and run `scripts/postgres/1-create-schema.sql` on it.
+2. Set the environment variables: at least `NODE_ENV=production`, `DB_PROVIDER=postgres`, the database connection,
+   both Azure AD settings, `REQUIRE_AUTH=true` and `ADMIN_EMAILS`.
+3. Install with `npm ci --omit=dev` (skips the test tools) and start with `node server.js`.
+   (`npm start` sets `NODE_ENV` itself, but only works on macOS and Linux.)
+4. Allow the host's outgoing IP address through the database firewall. Azure Database for PostgreSQL also requires SSL,
+   which is the default.
+5. Add `https://<your address>/auth/callback` to the Azure AD redirect URIs.
+6. Make sure the database is backed up. Azure Database for PostgreSQL does this automatically; check how long backups are kept.
 
-### Step 3: API Permissions
+The server expects one proxy in front of it (it trusts the first `X-Forwarded-For` hop), which suits Azure App Service
+and similar hosts.
 
-Go to **API permissions** → **Add a permission** → **Microsoft Graph** → **Delegated permissions**:
+**Upgrading an older database.** A database created before the audit log or the double-booking protection existed needs
+[scripts/postgres/4-add-audit-log.sql](scripts/postgres/4-add-audit-log.sql) and
+[scripts/postgres/5-prevent-double-booking.sql](scripts/postgres/5-prevent-double-booking.sql). Both are safe to run more
+than once; script 5 refuses, changing nothing, if double bookings already exist.
 
-| Permission | Purpose |
-|------------|---------|
-| `openid` | OpenID Connect sign-in |
-| `profile` | Read user profile |
-| `email` | Read user email |
-| `User.Read` | Read signed-in user's profile |
-| `User.Read.All` | List users for manager selection |
-| `Directory.Read.All` | Get direct reports count |
+## Tests
 
-Click **Grant admin consent for [your tenant]**.
+| Command | What it runs |
+| --- | --- |
+| `npm test` | Server tests (Jest): routes, sign-in, roles, audit log, rate limits, validation. No database needed. |
+| `npm run test:coverage` | The same, with a coverage report. |
+| `npm run test:e2e` | Browser tests (Playwright): the real app in Chromium against a throwaway database. |
 
-### Step 4: Copy Credentials
+The browser tests need a local PostgreSQL server and a one-time `npx playwright install chromium`. See
+[E2E-TESTS.md](E2E-TESTS.md).
 
-From the **Overview** page, copy:
-- **Application (client) ID** → `AZURE_AD_CLIENT_ID`
-- **Directory (tenant) ID** → `AZURE_AD_TENANT_ID`
+`npm run format` and `npm run format:check` run Prettier. `npm run lint` does not work yet: ESLint 9 needs an
+`eslint.config.js`, and the repository still has the older `.eslintrc.json`.
 
----
-
-## 💻 Development
-
-### NPM Scripts
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start development server with hot reload |
-| `npm start` | Start production server |
-| `npm test` | Run test suite |
-| `npm run test:watch` | Run tests in watch mode |
-| `npm run test:coverage` | Run tests with coverage report |
-| `npm run lint` | Check code style with ESLint |
-| `npm run lint:fix` | Auto-fix linting issues |
-| `npm run format` | Format code with Prettier |
-| `npm run format:check` | Check formatting without changes |
-
-### Testing
-
-```bash
-# Run all tests
-npm test
-
-# Run with coverage
-npm run test:coverage
-
-# Run in watch mode during development
-npm run test:watch
-```
-
-**Current Coverage:** 95%+ across 161 tests
-
-### Code Quality
-
-```bash
-# Check linting
-npm run lint
-
-# Auto-fix issues
-npm run lint:fix
-
-# Format code
-npm run format
-```
-
-### Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| `←` or `A` | Previous month |
-| `→` or `D` | Next month |
-
----
-
-## 🏗️ Architecture
-
-### Project Structure
+## How it is put together
 
 ```
-office-booking/
-├── server.js                 # Express server entry point
-├── package.json              # Dependencies and scripts
-├── jest.config.js            # Test configuration
-├── .eslintrc.json            # ESLint configuration
-├── .prettierrc               # Prettier configuration
-├── render.yaml               # Render deployment config
-├── supabase-schema.sql       # Database schema
-│
-├── config/
-│   └── supabase.js           # Supabase client initialization
-│
-├── middleware/
-│   ├── index.js              # Middleware exports
-│   ├── auth.js               # JWT verification (JWKS)
-│   └── requireAuth.js        # Route protection
-│
-├── routes/
-│   ├── index.js              # Route exports
-│   ├── auth.js               # Authentication config endpoint
-│   ├── data.js               # Initial data load
-│   ├── bookings.js           # Team booking CRUD
-│   ├── locations.js          # Location management
-│   ├── teams.js              # Team management
-│   ├── holidays.js           # Public holidays
-│   ├── desks.js              # Desk CRUD
-│   ├── floorElements.js      # Floor plan elements
-│   └── deskBookings.js       # Desk reservation CRUD
-│
-├── socket/
-│   └── presence.js           # Socket.IO presence handlers
-│
-├── utils/
-│   ├── helpers.js            # Case conversion utilities
-│   └── logger.js             # Environment-aware logging
-│
-├── public/
-│   ├── index.html            # Main SPA entry
-│   ├── checkin.html          # QR code check-in page
-│   ├── styles.css            # Application styles
-│   ├── auth.js               # Azure AD MSAL integration
-│   ├── floor-plan.js         # Floor plan editor
-│   └── js/
-│       ├── main.js           # App initialization
-│       ├── state.js          # Centralized state
-│       ├── config.js         # Frontend configuration
-│       ├── api.js            # API client
-│       ├── fetch-utils.js    # Fetch with retry/timeout
-│       ├── calendar.js       # Calendar rendering
-│       ├── bookings.js       # Booking operations
-│       ├── teams.js          # Team management UI
-│       ├── locations.js      # Location management UI
-│       ├── holidays.js       # Holiday management
-│       ├── desks.js          # Desk operations
-│       ├── dragdrop.js       # Drag and drop
-│       ├── socket.js         # Socket.IO client
-│       ├── theme.js          # Theme switching
-│       ├── views.js          # View management
-│       ├── utils.js          # UI utilities
-│       ├── errors.js         # Error handling
-│       ├── validation.js     # Input validation
-│       ├── loading.js        # Loading states
-│       ├── date-utils.js     # Date handling
-│       ├── event-manager.js  # Event listener cleanup
-│       └── azure-managers.js # Azure AD integration
-│
-└── __tests__/
-    ├── setup.js              # Jest setup
-    ├── mocks/
-    │   └── supabase.mock.js  # Supabase mock
-    ├── routes/               # Route tests
-    ├── middleware/           # Middleware tests
-    └── utils/                # Utility tests
+server.js                 Express app: security headers, rate limits, sign-in, routes, Socket.IO
+config/
+  supabase.js             Picks the database from DB_PROVIDER
+  postgres.js             PostgreSQL connection pool
+middleware/
+  auth.js                 Verifies Azure AD tokens
+  requireAuth.js          Refuses requests without a login (REQUIRE_AUTH)
+  permissions.js          Admin, team lead and audit reader checks
+  audit.js                Writes the audit log
+  rateLimit.js            Per-person and per-IP request limits
+  socketAuth.js           Sign-in for live connections
+routes/                   One file per API area (see API below)
+socket/presence.js        Who is viewing which page, and live update messages
+utils/
+  pgQueryBuilder.js       Turns the routes' database calls into parameterised SQL
+  validate.js             Checks request input
+  graphIdentity.js        Confirms a person's job title with Microsoft Graph
+  dates.js, helpers.js, logger.js, permissions.js
+public/
+  index.html, styles.css  The app's single page
+  auth.js                 Microsoft sign-in (MSAL); adds the login to every API call
+  floor-plan.js           The Desks page
+  checkin.html            The page a desk's QR code opens
+  floorplans/             Office drawings shown behind the desks
+  js/                     The other pages and shared code (calendar, teams, access, audit, live updates, ...)
+scripts/
+  postgres/               Schema (1) and upgrade scripts for older databases (4, 5)
+  floor-plan-layout.js    Desk positions measured from the Johannesburg drawing
+__tests__/                Server tests
+e2e/                      Browser tests and their test data
 ```
 
-### Tech Stack
+**Tables:** `locations`, `teams`, `bookings` (team bookings), `public_holidays`, `desks`, `floor_elements` (rooms,
+walls, labels), `desk_bookings`, `settings` and `audit_log`. The full definitions are in
+[scripts/postgres/1-create-schema.sql](scripts/postgres/1-create-schema.sql).
 
-| Layer | Technology |
-|-------|------------|
-| **Runtime** | Node.js 18+ |
-| **Framework** | Express 4.x |
-| **Database** | Supabase (PostgreSQL) |
-| **Real-time** | Socket.IO 4.x |
-| **Authentication** | Azure AD (MSAL.js 2.x) |
-| **Security** | Helmet, express-rate-limit |
-| **Testing** | Jest, Supertest |
-| **Frontend** | Vanilla ES6 Modules |
+## API
 
-### Database Schema
+Everything is under `/api` and returns JSON. With `REQUIRE_AUTH=true`, every request needs an Azure AD ID token in an
+`Authorization: Bearer <token>` header, apart from the sign-in settings and the QR check-in lookup. Changes are refused
+unless the person's role allows them (see [ROLES-AND-AUDIT.md](ROLES-AND-AUDIT.md)).
 
-| Table | Description |
-|-------|-------------|
-| `locations` | Office locations with capacity and coordinates |
-| `teams` | Teams with managers, colors, member counts |
-| `bookings` | Team calendar bookings |
-| `holidays` | Public holidays |
-| `desks` | Floor plan desks with QR codes |
-| `floor_elements` | Rooms, walls, labels |
-| `desk_bookings` | Individual desk reservations |
+| Endpoint | Purpose | Who can change |
+| --- | --- | --- |
+| `GET /api/auth/config` | Sign-in settings for the browser | |
+| `GET /api/me` | The signed-in person and what they may do | |
+| `GET /api/data` | Offices, teams and holidays, loaded when the app opens | |
+| `GET, POST /api/bookings`, `PUT, DELETE /api/bookings/:id` | Team bookings on the Calendar | Admins and team leads |
+| `GET /api/bookings/:id/ics` | One booking as a calendar file | |
+| `POST /api/locations`, `PUT, DELETE /api/locations/:id` | Offices | Admins |
+| `POST /api/teams`, `PUT, DELETE /api/teams/:id` | Teams | Admins |
+| `GET /api/holidays/fetch/:year`, `POST /api/holidays`, `DELETE /api/holidays/:date` | Public holidays | Admins |
+| `GET, POST /api/desks`, `PUT, DELETE /api/desks/:id` | Desks | Admins |
+| `GET, POST /api/floor-elements`, `PUT, DELETE /api/floor-elements/:id` | Rooms, walls and labels | Admins |
+| `GET, POST /api/desk-bookings`, `DELETE /api/desk-bookings/:id` | Desk bookings | Everyone (their own; admins any) |
+| `POST /api/desk-bookings/:id/checkin` | Check in to a desk booking | The person who booked it |
+| `GET /api/checkin/:qrCode` | What a desk's QR code points to (no login needed) | |
+| `GET, PUT /api/settings/:key` | App settings such as admins, roles and floor plan drawings | Admins |
+| `GET /api/audit` | The audit log | Admins and audit readers |
 
-See [`supabase-schema.sql`](supabase-schema.sql) for complete schema.
+## Security
 
----
+- Azure AD sign-in, with tokens checked against Microsoft's published keys (audience, issuer and expiry).
+- Roles enforced on the server, not just hidden in the page.
+- Every change recorded in the audit log, including refused attempts.
+- Rate limits per signed-in person and per IP address.
+- Security headers through Helmet, including a Content Security Policy and HSTS.
+- Database calls are always parameterised, and user text is escaped before it is shown.
+- Input checked on the server (`utils/validate.js`).
+- With `REQUIRE_AUTH=true`, live connections need a valid login too.
 
-## 📡 API Reference
+## Troubleshooting
 
-### Authentication
+**Sign-in fails with AADSTS50011 (reply URL does not match).** The redirect URI in Azure AD must be the exact address
+plus `/auth/callback`, including `https://`.
 
-All write operations (POST, PUT, DELETE) require a valid Azure AD token in the `Authorization` header:
+**Nobody can change settings after turning on `REQUIRE_AUTH`.** Set `ADMIN_EMAILS` to at least one admin's email.
 
-```
-Authorization: Bearer <id_token>
-```
+**A team lead cannot make Calendar bookings.** Check their job title in Azure AD, then switch on "Lead teams & Calendar
+bookings" for that title on **Settings > Access & Roles**.
 
-GET requests work without authentication for public read access.
+**"relation does not exist".** The tables are missing: run `scripts/postgres/1-create-schema.sql` on the database.
 
-### Endpoints
+**The app cannot reach the database.** Allow the app's IP address in the database firewall, and check `DB_SSL`: hosted
+databases need `require`; use `disable` only for a local database.
 
-#### Data
+**"Too many requests".** Each signed-in person gets 1000 API requests per 15 minutes; raise `RATE_LIMIT_MAX` if people hit
+it. If everyone is hit at once, check that Azure AD is configured: without it, every request counts against the shared
+per-IP limit.
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|:----:|-------------|
-| GET | `/api/data` | ❌ | Get all data (locations, teams, bookings, holidays) |
-
-#### Bookings
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|:----:|-------------|
-| GET | `/api/bookings` | ❌ | List bookings (filter: year, month, locationId) |
-| POST | `/api/bookings` | ✅ | Create booking |
-| PUT | `/api/bookings/:id` | ✅ | Update booking |
-| DELETE | `/api/bookings/:id` | ✅ | Delete booking |
-| GET | `/api/bookings/:id/ics` | ❌ | Download ICS file |
-
-#### Locations
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|:----:|-------------|
-| POST | `/api/locations` | ✅ | Create location |
-| PUT | `/api/locations/:id` | ✅ | Update location |
-| DELETE | `/api/locations/:id` | ✅ | Delete location |
-
-#### Teams
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|:----:|-------------|
-| POST | `/api/teams` | ✅ | Create team |
-| PUT | `/api/teams/:id` | ✅ | Update team |
-| DELETE | `/api/teams/:id` | ✅ | Delete team |
-
-#### Holidays
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|:----:|-------------|
-| GET | `/api/holidays/fetch/:year` | ❌ | Fetch holidays from Nager.Date |
-| POST | `/api/holidays` | ✅ | Save holidays |
-| DELETE | `/api/holidays/:date` | ✅ | Delete holiday |
-
-#### Desks
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|:----:|-------------|
-| GET | `/api/desks` | ❌ | List desks (filter: locationId) |
-| POST | `/api/desks` | ✅ | Create desk |
-| PUT | `/api/desks/:id` | ✅ | Update desk |
-| DELETE | `/api/desks/:id` | ✅ | Delete desk |
-
-#### Floor Elements
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|:----:|-------------|
-| GET | `/api/floor-elements` | ❌ | List elements (filter: locationId) |
-| POST | `/api/floor-elements` | ✅ | Create element |
-| PUT | `/api/floor-elements/:id` | ✅ | Update element |
-| DELETE | `/api/floor-elements/:id` | ✅ | Delete element |
-
-#### Desk Bookings
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|:----:|-------------|
-| GET | `/api/desk-bookings` | ❌ | List desk bookings |
-| POST | `/api/desk-bookings` | ✅ | Create desk booking |
-| DELETE | `/api/desk-bookings/:id` | ✅ | Cancel booking |
-| POST | `/api/desk-bookings/:id/checkin` | ✅ | Check in |
-| GET | `/api/checkin/:qrCode` | ❌ | Get check-in data |
-
----
-
-## 🔒 Security
-
-### Implemented Protections
-
-| Protection | Implementation |
-|------------|----------------|
-| **XSS Prevention** | `escapeHtml()` on all user content (72 calls) |
-| **Content Security Policy** | Strict CSP via Helmet |
-| **Rate Limiting** | 1000 req/15min per user, 300 per IP signed out, 5000 per IP overall |
-| **JWT Validation** | JWKS verification of Azure AD tokens |
-| **HTTPS Headers** | HSTS, X-Frame-Options, X-Content-Type-Options |
-| **Input Validation** | Frontend and backend validation |
-| **SQL Injection** | Parameterized queries via Supabase |
-
-### Security Headers
-
-The server sets these headers via Helmet:
-
-```
-Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://alcdn.msauth.net ...
-Strict-Transport-Security: max-age=15552000; includeSubDomains
-X-Content-Type-Options: nosniff
-X-Frame-Options: SAMEORIGIN
-X-XSS-Protection: 0
-```
-
----
-
-## 🚢 Deployment
-
-### Render (Recommended)
-
-1. Connect your GitHub repository to [Render](https://render.com)
-2. Create a new **Web Service**
-3. Render auto-detects `render.yaml` configuration
-4. Add environment variables in the Render dashboard
-5. Add your Render URL to Azure AD redirect URIs
-6. Deploy!
-
-### Environment Variables on Render
-
-Set these in the Render dashboard under **Environment**:
-
-- `SUPABASE_URL`
-- `SUPABASE_SECRET_KEY`
-- `AZURE_AD_CLIENT_ID`
-- `AZURE_AD_TENANT_ID`
-- `NODE_ENV=production`
-
-### Other Platforms
-
-| Platform | Notes |
-|----------|-------|
-| [Railway](https://railway.app) | Simple deployment, free tier available |
-| [Heroku](https://heroku.com) | Classic PaaS, requires credit card |
-| [DigitalOcean](https://www.digitalocean.com/products/app-platform) | App Platform for scalability |
-| [Fly.io](https://fly.io) | Edge deployment with free tier |
-
----
-
-## 🔧 Troubleshooting
-
-### Azure AD Issues
-
-**"AADSTS50011: The reply URL does not match"**
-- Add your exact URL (including protocol) to Azure AD → Authentication → Redirect URIs
-
-**"user_cancelled: User cancelled the flow"**
-- Check that CSP allows `frame-src` for `login.microsoftonline.com`
-- Ensure MSAL is initialized with `await msalInstance.initialize()`
-
-**"Insufficient privileges"**
-- Go to Azure AD → API permissions → Grant admin consent
-- Ensure `User.Read.All` and `Directory.Read.All` are granted
-
-**No managers in dropdown**
-- Go to Settings → Access & Roles and switch on "Lead teams & Calendar bookings" for the allowed job titles
-- Verify users have job titles set in Azure AD
-
-### Database Issues
-
-**"relation does not exist"**
-- Run `supabase-schema.sql` in the Supabase SQL Editor
-
-**"permission denied"**
-- Ensure you're using the **service role key**, not the anon key
-
-### Deployment Issues
-
-**"X-Forwarded-For header is set but trust proxy is false"**
-- Already fixed: `app.set('trust proxy', 1)` is configured
-
-**Rate limit errors in development**
-- Limits are counted per signed-in user, so one person can no longer lock out a whole office that shares an IP
-- Tune with `RATE_LIMIT_MAX` (per user), `RATE_LIMIT_ANON_MAX` (per IP, signed out) and `RATE_LIMIT_IP_MAX` (per IP, all requests)
-- Restart server or wait for the 15 minute window to reset
-
----
-
----
-
-## 🙏 Acknowledgments
-
-- [Supabase](https://supabase.com) — PostgreSQL backend
-- [Azure AD](https://azure.microsoft.com) — Enterprise authentication
-- [Socket.IO](https://socket.io) — Real-time communication
-- [Nager.Date](https://date.nager.at) — Public holidays API
+**Changes do not show after a deploy.** Browsers can keep a floor plan drawing for up to an hour; a hard refresh
+(Cmd+Shift+R or Ctrl+Shift+R) loads the new one.
