@@ -33,7 +33,7 @@ A modern, real-time web application for managing office space bookings, team sch
 - **Azure AD Single Sign-On** — Sign in with Microsoft work accounts
 - **JWT Token Validation** — Backend verifies Azure AD tokens via JWKS
 - **Role-based Access** — Configurable team lead job titles
-- **Rate Limiting** — 200 requests per 15 minutes per IP
+- **Rate Limiting** — 1000 requests per 15 minutes per signed-in user (300 per IP when not signed in), with a 5000 per IP flood guard
 - **Security Headers** — Full CSP, HSTS, X-Frame-Options via Helmet
 - **XSS Protection** — HTML escaping on all user-generated content
 
@@ -437,7 +437,7 @@ GET requests work without authentication for public read access.
 |------------|----------------|
 | **XSS Prevention** | `escapeHtml()` on all user content (72 calls) |
 | **Content Security Policy** | Strict CSP via Helmet |
-| **Rate Limiting** | 200 req/15min per IP |
+| **Rate Limiting** | 1000 req/15min per user, 300 per IP signed out, 5000 per IP overall |
 | **JWT Validation** | JWKS verification of Azure AD tokens |
 | **HTTPS Headers** | HSTS, X-Frame-Options, X-Content-Type-Options |
 | **Input Validation** | Frontend and backend validation |
@@ -522,8 +522,9 @@ Set these in the Render dashboard under **Environment**:
 - Already fixed: `app.set('trust proxy', 1)` is configured
 
 **Rate limit errors in development**
-- The limit is 200 requests per 15 minutes
-- Restart server or wait for the window to reset
+- Limits are counted per signed-in user, so one person can no longer lock out a whole office that shares an IP
+- Tune with `RATE_LIMIT_MAX` (per user), `RATE_LIMIT_ANON_MAX` (per IP, signed out) and `RATE_LIMIT_IP_MAX` (per IP, all requests)
+- Restart server or wait for the 15 minute window to reset
 
 ---
 
