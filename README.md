@@ -4,7 +4,7 @@ A modern, real-time web application for managing office space bookings, team sch
 
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Express](https://img.shields.io/badge/Express-4.x-000000?logo=express&logoColor=white)](https://expressjs.com/)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Azure AD](https://img.shields.io/badge/Azure%20AD-SSO-0078D4?logo=microsoft&logoColor=white)](https://azure.microsoft.com/)
 [![Socket.IO](https://img.shields.io/badge/Socket.IO-Real--time-010101?logo=socket.io&logoColor=white)](https://socket.io/)
 [![Test Coverage](https://img.shields.io/badge/Coverage-95%25-brightgreen)](coverage/)
@@ -75,7 +75,7 @@ A modern, real-time web application for managing office space bookings, team sch
 |-------------|---------|---------|
 | [Node.js](https://nodejs.org/) | 18+ | Runtime |
 | [npm](https://www.npmjs.com/) | 9+ | Package manager |
-| [Supabase](https://supabase.com/) | Free tier | PostgreSQL database |
+| [PostgreSQL](https://www.postgresql.org/) | 14+ | Database |
 | [Azure AD](https://portal.azure.com/) | Any tenant | Authentication |
 
 ### Installation
@@ -89,11 +89,10 @@ cd office-booking
 npm install
 
 # Set up environment variables
-cp .env.example .env
-# Edit .env with your credentials (see Configuration section)
+# Create .env with your settings (see Configuration section)
 
-# Initialize database
-# Run the contents of supabase-schema.sql in Supabase SQL Editor
+# Initialize database (creates the tables; safe to run twice)
+psql "$DATABASE_URL" -f scripts/postgres/1-create-schema.sql
 
 # Start development server
 npm run dev
@@ -110,9 +109,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 Create a `.env` file in the project root:
 
 ```env
-# Supabase (Required)
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SECRET_KEY=your-service-role-key
+# Database (Required)
+DB_PROVIDER=postgres
+DATABASE_URL=postgresql://user:password@host:5432/office_booking
 
 # Azure AD (Required for authentication)
 AZURE_AD_CLIENT_ID=your-client-id
@@ -125,12 +124,24 @@ NODE_ENV=development
 
 | Variable | Required | Description |
 |----------|:--------:|-------------|
-| `SUPABASE_URL` | ✅ | Your Supabase project URL |
-| `SUPABASE_SECRET_KEY` | ✅ | Supabase service role key (not anon key) |
+| `DB_PROVIDER` | ✅ | `postgres`. The default is still `supabase`, so set it explicitly |
+| `DATABASE_URL` | ✅ | Full PostgreSQL connection string. Use this **or** `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` (`DB_PORT` defaults to 5432) |
+| `DB_SSL` | ❌ | `require` (default, verifies the certificate), `no-verify`, or `disable` (local only) |
+| `DB_POOL_MAX` | ❌ | Connection pool size (default: 10) |
 | `AZURE_AD_CLIENT_ID` | ✅ | Azure AD Application (client) ID |
 | `AZURE_AD_TENANT_ID` | ✅ | Azure AD Directory (tenant) ID |
+| `REQUIRE_AUTH` | ❌ | `true` to refuse every API request without a valid login |
+| `ADMIN_EMAILS` | ❌ | Comma-separated emails that are always admins |
+| `CORS_ORIGINS` | ❌ | Comma-separated origins allowed to call the API from another site (default: none) |
+| `OFFICE_TIMEZONE` | ❌ | Time zone that decides "today" (default: `Africa/Johannesburg`) |
+| `RATE_LIMIT_MAX`, `RATE_LIMIT_ANON_MAX`, `RATE_LIMIT_IP_MAX` | ❌ | Requests per 15 minutes per user, per IP when signed out, and per IP overall (defaults 1000, 300, 5000) |
 | `PORT` | ❌ | Server port (default: 3000) |
-| `NODE_ENV` | ❌ | `development` or `production` |
+| `NODE_ENV` | ❌ | Set to `production` in production (hides error details, quiets logs) |
+
+Azure Database for PostgreSQL only accepts connections from IP addresses allowed in its firewall rules, and requires SSL.
+
+The app can still run against Supabase (`DB_PROVIDER=supabase` with `SUPABASE_URL` and `SUPABASE_SECRET_KEY`, schema in
+[`supabase-schema.sql`](supabase-schema.sql)), but production uses PostgreSQL.
 
 > ⚠️ **Security Note:** Never commit `.env` to version control. It's already in `.gitignore`.
 
@@ -155,7 +166,7 @@ After registration, go to **Authentication** and add all environments:
 | Environment | Redirect URI |
 |-------------|--------------|
 | Local | `http://localhost:3000` |
-| Production | `https://your-app.onrender.com` |
+| Production | `https://your-app-host.example.com` |
 | Custom Domain | `https://booking.yourcompany.com` |
 
 > **Important:** The redirect URI must match your actual domain exactly.
@@ -247,11 +258,15 @@ office-booking/
 ├── jest.config.js            # Test configuration
 ├── .eslintrc.json            # ESLint configuration
 ├── .prettierrc               # Prettier configuration
-├── render.yaml               # Render deployment config
-├── supabase-schema.sql       # Database schema
+├── supabase-schema.sql       # Schema for the Supabase option
 │
 ├── config/
-│   └── supabase.js           # Supabase client initialization
+│   ├── supabase.js           # Picks the database (DB_PROVIDER)
+│   └── postgres.js           # Direct PostgreSQL connection
+│
+├── scripts/
+│   ├── floor-plan-layout.js  # Desk positions for the JHB floor plan drawing
+│   └── postgres/             # Schema (1) and upgrade scripts for older databases (4, 5)
 │
 ├── middleware/
 │   ├── index.js              # Middleware exports
@@ -322,7 +337,7 @@ office-booking/
 |-------|------------|
 | **Runtime** | Node.js 18+ |
 | **Framework** | Express 4.x |
-| **Database** | Supabase (PostgreSQL) |
+| **Database** | PostgreSQL |
 | **Real-time** | Socket.IO 4.x |
 | **Authentication** | Azure AD (MSAL.js 2.x) |
 | **Security** | Helmet, express-rate-limit |
@@ -341,7 +356,12 @@ office-booking/
 | `floor_elements` | Rooms, walls, labels |
 | `desk_bookings` | Individual desk reservations |
 
-See [`supabase-schema.sql`](supabase-schema.sql) for complete schema.
+See [`scripts/postgres/1-create-schema.sql`](scripts/postgres/1-create-schema.sql) for the complete schema.
+
+A database created before the audit log or the double-booking protection existed needs
+[`4-add-audit-log.sql`](scripts/postgres/4-add-audit-log.sql) and
+[`5-prevent-double-booking.sql`](scripts/postgres/5-prevent-double-booking.sql). Both are safe to run more than once;
+5 refuses, changing nothing, if double bookings already exist.
 
 ---
 
@@ -441,7 +461,7 @@ GET requests work without authentication for public read access.
 | **JWT Validation** | JWKS verification of Azure AD tokens |
 | **HTTPS Headers** | HSTS, X-Frame-Options, X-Content-Type-Options |
 | **Input Validation** | Frontend and backend validation |
-| **SQL Injection** | Parameterized queries via Supabase |
+| **SQL Injection** | Parameterized queries (`utils/pgQueryBuilder.js`) |
 
 ### Security Headers
 
@@ -459,33 +479,13 @@ X-XSS-Protection: 0
 
 ## 🚢 Deployment
 
-### Render (Recommended)
+Any host that runs Node.js 20+ works. Wherever it runs:
 
-1. Connect your GitHub repository to [Render](https://render.com)
-2. Create a new **Web Service**
-3. Render auto-detects `render.yaml` configuration
-4. Add environment variables in the Render dashboard
-5. Add your Render URL to Azure AD redirect URIs
-6. Deploy!
-
-### Environment Variables on Render
-
-Set these in the Render dashboard under **Environment**:
-
-- `SUPABASE_URL`
-- `SUPABASE_SECRET_KEY`
-- `AZURE_AD_CLIENT_ID`
-- `AZURE_AD_TENANT_ID`
-- `NODE_ENV=production`
-
-### Other Platforms
-
-| Platform | Notes |
-|----------|-------|
-| [Railway](https://railway.app) | Simple deployment, free tier available |
-| [Heroku](https://heroku.com) | Classic PaaS, requires credit card |
-| [DigitalOcean](https://www.digitalocean.com/products/app-platform) | App Platform for scalability |
-| [Fly.io](https://fly.io) | Edge deployment with free tier |
+1. Set the environment variables above, including `NODE_ENV=production`.
+2. Install with `npm ci --omit=dev` (skips the test tools) and start with `node server.js`.
+3. Allow the host's outgoing IP address in the database firewall.
+4. Add the app's URL to the Azure AD redirect URIs (see Azure AD Setup).
+5. Make sure the database is backed up. Azure Database for PostgreSQL does this automatically; check the retention period.
 
 ---
 
@@ -511,10 +511,11 @@ Set these in the Render dashboard under **Environment**:
 ### Database Issues
 
 **"relation does not exist"**
-- Run `supabase-schema.sql` in the Supabase SQL Editor
+- Run `scripts/postgres/1-create-schema.sql` against the database
 
-**"permission denied"**
-- Ensure you're using the **service role key**, not the anon key
+**Cannot connect / connection timed out**
+- Allow the app's IP address in the database firewall
+- Check `DB_SSL`: hosted databases need `require`; use `disable` only for a local database
 
 ### Deployment Issues
 
@@ -532,7 +533,7 @@ Set these in the Render dashboard under **Environment**:
 
 ## 🙏 Acknowledgments
 
-- [Supabase](https://supabase.com) — PostgreSQL backend
+- [PostgreSQL](https://www.postgresql.org) — Database
 - [Azure AD](https://azure.microsoft.com) — Enterprise authentication
 - [Socket.IO](https://socket.io) — Real-time communication
 - [Nager.Date](https://date.nager.at) — Public holidays API
