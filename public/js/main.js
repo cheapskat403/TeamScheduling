@@ -10,7 +10,8 @@ import { state, elements, initElements } from './state.js';
 import { loadTheme, toggleTheme } from './theme.js';
 import { initSocket, joinCurrentRoom, simulateNewUser } from './socket.js';
 import { loadData, loadBookingsForMonth, invalidateBookingsCache } from './api.js';
-import { renderCalendar, navigateMonth, goToToday, renderSkeletonCalendar } from './calendar.js';
+import { renderCalendar, navigateMonth, goToToday } from './calendar.js';
+import { withPageSpinner } from './loading.js';
 import { 
     openBookingModal, closeModal, handleBookingSubmit, 
     editBooking, deleteBooking, handleTeamSelect, renderDayBookings,
@@ -49,6 +50,15 @@ import './confirm.js';
  * Called after authentication is complete
  */
 async function initApp() {
+    try {
+        await startApp();
+    } finally {
+        // The startup loading screen stays up until the first page is fully loaded
+        window.hideAuthLoading?.();
+    }
+}
+
+async function startApp() {
     console.log('🏢 Initializing Office Booking System...');
     
     // Initialize DOM element references
@@ -212,30 +222,20 @@ function handleKeyboardNav(e) {
  */
 async function handleLocationChange(e) {
     state.currentLocation = e.target.value;
-    state.bookings = []; // Clear bookings to show loading state
-    
-    // Show skeleton loader
-    elements.calendarGrid?.classList.add('calendar-skeleton');
-    renderSkeletonCalendar();
-    
-    updateCapacityDisplay();
-    renderTeamSelect();
-    joinCurrentRoom();
-    
-    // Load bookings in background and re-render when done
-    await loadBookingsForMonth();
-    renderCalendar();
-    updateCapacityDisplay();
-    
-    // Reload desks if desks view is active
-    if (document.getElementById('desksView')?.classList.contains('active')) {
-        if (typeof window.updateFloorSelector === 'function') {
-            window.updateFloorSelector();
+
+    // Cover the page until the new office's bookings (and desks, on the Desks page) are in
+    await withPageSpinner(async () => {
+        renderTeamSelect();
+        joinCurrentRoom();
+        await loadBookingsForMonth();
+        renderCalendar();
+        updateCapacityDisplay();
+
+        if (document.getElementById('desksView')?.classList.contains('active')) {
+            window.updateFloorSelector?.();
+            await window.loadDesks?.();
         }
-        if (typeof window.loadDesks === 'function') {
-            window.loadDesks();
-        }
-    }
+    });
 }
 
 /**

@@ -231,6 +231,11 @@ async function loadDesks() {
     }
 }
 
+/** Load with the page covered until everything is in: for opening another floor or week, not for refreshes */
+function loadDesksWithSpinner() {
+    return window.withPageSpinner ? window.withPageSpinner(loadDesks) : loadDesks();
+}
+
 function renderAllDesks() {
     renderDayStrip();
     renderFloorMap();
@@ -251,7 +256,7 @@ function selectDay(dateStr) {
         deskState.deskBookings = deskState.rangeBookings.filter(b => b.date === dateStr);
         renderAllDesks();
     } else {
-        loadDesks();
+        loadDesksWithSpinner();
     }
 }
 
@@ -290,7 +295,7 @@ function initDesksView() {
             deskState.suggestion = null;
             deskState.view = { zoom: 1, panX: 0, panY: 0 };
             hideDeskCard();
-            loadDesks();
+            loadDesksWithSpinner();
         });
 
         deskForm.addEventListener('submit', handleDeskSubmit);
@@ -372,7 +377,7 @@ function initDesksView() {
         ).join('');
     }
 
-    loadDesks();
+    return loadDesks();
 }
 
 // Update floor selector based on current location's floor count

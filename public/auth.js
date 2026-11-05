@@ -519,7 +519,8 @@ function showLoginUI() {
 
 // Hide login screen
 function hideLoginUI() {
-    hideAuthLoading();
+    // The app is about to start: initApp hides the loading screen once the first page is fully loaded
+    if (typeof initApp !== 'function') hideAuthLoading();
     
     const loginOverlay = document.getElementById('loginOverlay');
     if (loginOverlay) {
@@ -583,6 +584,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Expose Azure AD functions globally for use by other modules
 window.signIn = signIn;
+window.hideAuthLoading = hideAuthLoading;
 window.signOut = signOut;
 window.fetchAllJobTitles = fetchAllJobTitles;
 window.fetchUsersByJobTitles = fetchUsersByJobTitles;

@@ -66,3 +66,49 @@ export async function withLoadingState(button, asyncFn, options = {}) {
 }
 
 
+
+// ------------------------------------------------------------------ Page spinner
+
+/*
+ * While a page fetches its data, a spinner covers the page and the finished page appears in one go,
+ * instead of showing placeholders that fill in bit by bit. The cover fades in after a short delay (see
+ * .page-spinner in styles.css), so data that arrives quickly never flashes a spinner.
+ */
+let spinnerUsers = 0;
+
+function pageSpinnerEl() {
+    let spinner = document.getElementById('pageSpinner');
+    if (!spinner) {
+        spinner = document.createElement('div');
+        spinner.id = 'pageSpinner';
+        spinner.className = 'page-spinner';
+        spinner.setAttribute('role', 'status');
+        spinner.setAttribute('aria-label', 'Loading');
+        spinner.innerHTML = '<div class="page-spinner-wheel"></div>';
+        document.body.appendChild(spinner);
+    }
+    return spinner;
+}
+
+export function showPageSpinner() {
+    spinnerUsers++;
+    pageSpinnerEl().classList.add('visible');
+}
+
+export function hidePageSpinner() {
+    spinnerUsers = Math.max(0, spinnerUsers - 1);
+    if (spinnerUsers === 0) document.getElementById('pageSpinner')?.classList.remove('visible');
+}
+
+/** Run an async task with the page covered by the spinner until it finishes (or fails) */
+export async function withPageSpinner(task) {
+    showPageSpinner();
+    try {
+        return await task();
+    } finally {
+        hidePageSpinner();
+    }
+}
+
+// floor-plan.js is a plain script, not a module
+window.withPageSpinner = withPageSpinner;

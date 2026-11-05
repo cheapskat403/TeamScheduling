@@ -10,6 +10,7 @@ import { cleanupView } from './event-manager.js';
 import { canOpenView } from './permissions.js';
 import { initAuditView } from './audit.js';
 import { initAccessView } from './access.js';
+import { withPageSpinner } from './loading.js';
 
 // Floor plan module loading state
 let floorPlanModuleLoading = false;
@@ -89,16 +90,17 @@ export async function switchView(viewName, { updateUrl = true } = {}) {
             renderHolidaysList();
             break;
             
+        // These pages fetch their data when opened: cover them until it is all in
         case 'desks':
-            await loadFloorPlanModule();
+            await withPageSpinner(loadFloorPlanModule);
             break;
             
         case 'audit':
-            initAuditView();
+            await withPageSpinner(initAuditView);
             break;
 
         case 'access':
-            initAccessView();
+            await withPageSpinner(initAccessView);
             break;
     }
 }
@@ -110,7 +112,7 @@ async function loadFloorPlanModule() {
     if (floorPlanModuleLoaded || floorPlanModuleLoading) {
         // Module already loaded, just initialize
         if (typeof window.initDesksView === 'function') {
-            window.initDesksView();
+            await window.initDesksView();
         }
         return;
     }
@@ -138,7 +140,7 @@ async function loadFloorPlanModule() {
         
         // Initialize after load
         if (typeof window.initDesksView === 'function') {
-            window.initDesksView();
+            await window.initDesksView();
         }
         
     } catch (error) {
