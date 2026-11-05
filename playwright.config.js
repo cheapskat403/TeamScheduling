@@ -47,7 +47,9 @@ module.exports = defineConfig({
             AZURE_AD_CLIENT_ID: '',
             ADMIN_EMAILS: '',
             CORS_ORIGINS: '',
-            RATE_LIMIT_MAX: '100000'
+            RATE_LIMIT_MAX: '100000',
+            RATE_LIMIT_ANON_MAX: '100000',
+            RATE_LIMIT_IP_MAX: '100000'
         }
     }
 });

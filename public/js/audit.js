@@ -130,5 +130,5 @@ export function initAuditView() {
             loadPage(true);
         });
     }
-    loadPage(true);
+    return loadPage(true);
 }

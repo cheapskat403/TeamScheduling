@@ -66,3 +66,55 @@ export async function withLoadingState(button, asyncFn, options = {}) {
 }
 
 
+
+// ------------------------------------------------------------------ Page spinner
+
+/*
+ * While a page fetches its data, a spinner covers the page and the finished page appears in one go,
+ * instead of showing placeholders that fill in bit by bit.
+ *
+ * By default the cover fades in after a short delay (see .page-spinner in styles.css), so data that is
+ * often already there (a Calendar month seen before) never flashes a spinner. Pass { immediate: true }
+ * when opening a page or showing different content that always has to be fetched: otherwise the page
+ * would show for that moment, then the spinner, then the page again.
+ */
+let spinnerUsers = 0;
+
+function pageSpinnerEl() {
+    let spinner = document.getElementById('pageSpinner');
+    if (!spinner) {
+        spinner = document.createElement('div');
+        spinner.id = 'pageSpinner';
+        spinner.className = 'page-spinner';
+        spinner.setAttribute('role', 'status');
+        spinner.setAttribute('aria-label', 'Loading');
+        spinner.innerHTML = '<div class="page-spinner-wheel"></div>';
+        document.body.appendChild(spinner);
+    }
+    return spinner;
+}
+
+export function showPageSpinner({ immediate = false } = {}) {
+    spinnerUsers++;
+    const spinner = pageSpinnerEl();
+    if (immediate) spinner.classList.add('immediate');
+    spinner.classList.add('visible');
+}
+
+export function hidePageSpinner() {
+    spinnerUsers = Math.max(0, spinnerUsers - 1);
+    if (spinnerUsers === 0) document.getElementById('pageSpinner')?.classList.remove('visible', 'immediate');
+}
+
+/** Run an async task with the page covered by the spinner until it finishes (or fails) */
+export async function withPageSpinner(task, options) {
+    showPageSpinner(options);
+    try {
+        return await task();
+    } finally {
+        hidePageSpinner();
+    }
+}
+
+// floor-plan.js is a plain script, not a module
+window.withPageSpinner = withPageSpinner;

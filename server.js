@@ -13,7 +13,6 @@ const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const http = require('http');
 const path = require('path');
 const { Server } = require('socket.io');
@@ -44,6 +43,7 @@ const { attachPermissions, requireAdmin, requireCalendarAccess, onWrites } = req
 const { auditWrites } = require('./middleware/audit');
 const { warnIfNoAdmins } = require('./utils/permissions');
 const { socketAuth } = require('./middleware/socketAuth');
+const { createIpLimiter, createApiLimiter } = require('./middleware/rateLimit');
 
 // Initialize Express app
 const app = express();
@@ -105,15 +105,9 @@ app.use(helmet({
     crossOriginEmbedderPolicy: false, // Required for loading external resources
 }));
 
-// Rate limiting for API endpoints
-const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX, 10) || 200, // Limit each IP to this many requests per windowMs (RATE_LIMIT_MAX overrides it)
-    message: { error: 'Too many requests, please try again later.' },
-    standardHeaders: true,
-    legacyHeaders: false,
-});
-app.use('/api/', apiLimiter);
+// Rate limiting for API endpoints: a flood guard per IP here, and a limit per signed-in person once the
+// login is known (below). See middleware/rateLimit.js for why it is not simply per IP.
+app.use('/api/', createIpLimiter());
 
 // Enable Gzip compression for all responses
 app.use(compression());
@@ -149,6 +143,9 @@ app.use('/api/auth', authRoutes);
 
 // Attach the user if a valid token is present...
 app.use('/api', optionalAuth);
+
+// Limit requests per signed-in person (per IP for anyone not signed in)
+app.use('/api', createApiLimiter());
 
 // ...and, when REQUIRE_AUTH=true, refuse everything below without one. The only exceptions are the
 // QR check-in lookups (see PUBLIC_READ_PATHS), since people scanning a desk sticker are not signed in.
@@ -205,7 +202,7 @@ httpServer.listen(PORT, () => {
 ║                                                           ║
 ║   Security:                                               ║
 ║   ✓ Helmet (CSP, HSTS, X-Frame, etc.)                    ║
-║   ✓ Rate Limiting (200 req/15min per IP)                 ║
+║   ✓ Rate Limiting (per user, per IP flood guard)         ║
 ║                                                           ║
 ║   Press Ctrl+C to stop                                    ║
 ║                                                           ║
