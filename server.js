@@ -39,7 +39,7 @@ const auditRoutes = require('./routes/audit');
 // Import middleware
 const { authenticate, optionalAuth } = require('./middleware/auth');
 const { requireLoginForApi } = require('./middleware/requireAuth');
-const { attachPermissions, requireAdmin, requireCalendarAccess, onWrites } = require('./middleware/permissions');
+const { attachPermissions, requireAdmin, requireCalendarAccess, onWrites, teamWrites } = require('./middleware/permissions');
 const { auditWrites } = require('./middleware/audit');
 const { warnIfNoAdmins } = require('./utils/permissions');
 const { socketAuth } = require('./middleware/socketAuth');
@@ -168,12 +168,13 @@ app.use('/api/me', meRoutes);
 app.use('/api/audit', auditRoutes);
 
 // Resource routes (each router also protects its own writes).
-// Anyone signed in can read. Changing teams, locations, holidays, the desk layout and settings is for
-// admins; Calendar bookings need an allowed job title (or admin); desk bookings are open to everyone.
+// Anyone signed in can read. Changing locations, holidays, the desk layout and settings is for admins.
+// Calendar bookings, and adding or editing teams, need a team lead job title (or admin); deleting a team is
+// for admins. Desk bookings are open to everyone.
 app.use('/api/bookings', onWrites(requireCalendarAccess), bookingsRoutes);
 app.use('/api/locations', onWrites(requireAdmin), locationsRoutes);
 app.use('/api/holidays', onWrites(requireAdmin), holidaysRoutes);
-app.use('/api/teams', onWrites(requireAdmin), teamsRoutes);
+app.use('/api/teams', teamWrites, teamsRoutes);
 app.use('/api/desks', onWrites(requireAdmin), desksRoutes);
 app.use('/api/floor-elements', onWrites(requireAdmin), floorElementsRoutes);
 app.use('/api/desk-bookings', deskBookingsRoutes);

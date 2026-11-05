@@ -51,4 +51,13 @@ function onWrites(guardFn) {
     return (req, res, next) => (READ_METHODS.includes(req.method) ? next() : guardFn(req, res, next));
 }
 
-module.exports = { attachPermissions, requireAdmin, requireCalendarAccess, requireAuditAccess, onWrites };
+/**
+ * Teams: team leads (the job titles with "Lead teams & Calendar bookings") may add and edit teams.
+ * Deleting a team is for admins only.
+ */
+function teamWrites(req, res, next) {
+    if (READ_METHODS.includes(req.method)) return next();
+    return (req.method === 'DELETE' ? requireAdmin : requireCalendarAccess)(req, res, next);
+}
+
+module.exports = { attachPermissions, requireAdmin, requireCalendarAccess, requireAuditAccess, onWrites, teamWrites };

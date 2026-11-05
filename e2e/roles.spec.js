@@ -25,11 +25,20 @@ for (const role of Object.keys(RIGHTS)) {
     const r = RIGHTS[role];
 
     test.describe(`as ${role}`, () => {
-        test(`menu: Settings ${r.isAdmin ? 'shown' : 'hidden'}, Audit log ${r.canViewAudit ? 'shown' : 'hidden'}`, async ({ browser }) => {
+        const seesSettings = r.isAdmin || r.canBookCalendar;   // team leads get Settings with only Teams in it
+        test(`menu: Settings ${seesSettings ? 'shown' : 'hidden'}, Audit log ${r.canViewAudit ? 'shown' : 'hidden'}`, async ({ browser }) => {
             const who = await openAs(browser, role);
             const settings = who.page.locator('#settingsToggle');
             const audit = who.page.locator('.nav-item[data-view="audit"]');
-            await (r.isAdmin ? expect(settings).toBeVisible() : expect(settings).toBeHidden());
+            await (seesSettings ? expect(settings).toBeVisible() : expect(settings).toBeHidden());
+            if (seesSettings) {
+                await settings.click();
+                await expect(who.page.locator('.nav-subitem[data-view="teams"]')).toBeVisible();
+                for (const view of ['locations', 'holidays', 'access']) {
+                    const item = who.page.locator(`.nav-subitem[data-view="${view}"]`);
+                    await (r.isAdmin ? expect(item).toBeVisible() : expect(item).toBeHidden());
+                }
+            }
             await (r.canViewAudit ? expect(audit).toBeVisible() : expect(audit).toBeHidden());
             await expect(who.page.locator('.nav-item[data-view="calendar"]')).toBeVisible();
             await expect(who.page.locator('.nav-item[data-view="desks"]')).toBeVisible();
@@ -68,7 +77,8 @@ for (const role of Object.keys(RIGHTS)) {
 test.describe('pages people may not open', () => {
     for (const [role, hash, allowed] of [
         ['regular', '#teams', false], ['regular', '#access', false], ['manager', '#holidays', false], ['regular', '#audit', false],
-        ['auditor', '#audit', true], ['admin', '#teams', true], ['admin', '#access', true]
+        ['auditor', '#audit', true], ['admin', '#teams', true], ['admin', '#access', true], ['manager', '#teams', true],
+        ['manager', '#access', false], ['auditor', '#teams', false]
     ]) {
         test(`${role} opening ${hash} ${allowed ? 'works' : 'lands on the Calendar'}`, async ({ browser }) => {
             const who = await person(browser, { name: role, email: `${role}@example.com` });
@@ -79,4 +89,22 @@ test.describe('pages people may not open', () => {
             await who.context.close();
         });
     }
+});
+
+test.describe('Teams page for team leads', () => {
+    test('a team lead can add and edit teams but sees no Delete button; an admin sees Delete', async ({ browser }) => {
+        const lead = await openAs(browser, 'manager');
+        await lead.page.goto('/#teams');
+        await expect(lead.page.locator('#teamsView')).toHaveClass(/active/);
+        await expect(lead.page.locator('#addTeamBtn')).toBeVisible();
+        const card = lead.page.locator('.team-card').first();
+        await expect(card.getByRole('button', { name: 'Edit' })).toBeVisible();
+        await expect(card.getByRole('button', { name: 'Delete' })).toBeHidden();
+        await lead.context.close();
+
+        const admin = await openAs(browser, 'admin');
+        await admin.page.goto('/#teams');
+        await expect(admin.page.locator('.team-card').first().getByRole('button', { name: 'Delete' })).toBeVisible();
+        await admin.context.close();
+    });
 });

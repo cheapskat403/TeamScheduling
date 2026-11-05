@@ -131,7 +131,7 @@ async function togglePermission(input) {
 
 function renderSummary() {
     el('permSummary').textContent =
-        `${roles[LEAD].length} job title${roles[LEAD].length === 1 ? '' : 's'} can lead teams and make Calendar bookings; ` +
+        `${roles[LEAD].length} job title${roles[LEAD].length === 1 ? '' : 's'} can lead teams (add and edit them) and make Calendar bookings; ` +
         `${roles[AUDIT].length} can read the audit log.`;
 }
 

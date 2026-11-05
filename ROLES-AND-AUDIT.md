@@ -4,7 +4,9 @@
 
 | | Admin | Team lead roles | Everyone else (signed in) |
 | --- | --- | --- | --- |
-| Change teams, locations, holidays, desk layout, settings | yes | no | no |
+| Add and edit teams | yes | yes | no |
+| Delete teams | yes | no | no |
+| Change locations, holidays, desk layout, settings | yes | no | no |
 | Make, change, delete Calendar (team) bookings | yes | yes | no |
 | Book desks, cancel their own desk bookings | yes | yes | yes |
 | Cancel anyone's desk booking | yes | no | no |
@@ -14,7 +16,7 @@
 - **Admins** are the emails in the `ADMIN_EMAILS` setting on the host (comma separated), plus the list admins keep
   on the **Settings > Access & Roles** page. `ADMIN_EMAILS` always applies, so you cannot lock yourself out by editing the list.
 - **Team lead roles** are the Azure AD job titles chosen on **Settings > Access & Roles** (the "Lead teams & Calendar bookings" switch). The same switch decides who can make
-  Calendar bookings. Matching ignores upper/lower case and extra spaces.
+  Calendar bookings and add or edit teams (they see **Settings > Teams**, without the Delete button). Matching ignores upper/lower case and extra spaces.
 - **Audit log readers** are admins plus the job titles with the "Audit log" switch on **Settings > Access & Roles**.
 
 ## How the server knows a job title

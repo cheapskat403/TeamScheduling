@@ -118,7 +118,7 @@ export function renderTeamsList() {
                     ${team.manager ? `<div class="team-manager-row"><span>Manager:</span> ${escapeHtml(team.manager)}</div>` : ''}
                     <div class="team-card-actions">
                         <button class="btn btn-sm" onclick="editTeam('${escapeHtml(team.id)}')">Edit</button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteTeam('${escapeHtml(team.id)}')">Delete</button>
+                        <button class="btn btn-sm btn-danger admin-only" onclick="deleteTeam('${escapeHtml(team.id)}')">Delete</button>
                     </div>
                 </div>
             `;
@@ -149,7 +149,7 @@ export function renderTeamsList() {
                     ${team.manager ? `<div class="team-manager-row"><span>Manager:</span> ${escapeHtml(team.manager)}</div>` : ''}
                     <div class="team-card-actions">
                         <button class="btn btn-sm" onclick="editTeam('${escapeHtml(team.id)}')">Edit</button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteTeam('${escapeHtml(team.id)}')">Delete</button>
+                        <button class="btn btn-sm btn-danger admin-only" onclick="deleteTeam('${escapeHtml(team.id)}')">Delete</button>
                     </div>
                 </div>
             `;

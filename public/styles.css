@@ -5759,6 +5759,7 @@ form {
    this only hides controls that would be refused anyway.
    ============================================ */
 body:not(.is-admin) .admin-only { display: none !important; }
+body:not(.is-admin):not(.can-calendar) .lead-or-admin { display: none !important; }
 body:not(.can-audit) .audit-only { display: none !important; }
 
 .calendar-readonly-note {

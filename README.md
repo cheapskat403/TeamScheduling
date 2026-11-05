@@ -40,8 +40,8 @@ Node.js and Express on the server, PostgreSQL for data, Socket.IO for live updat
 - The Calendar and Desks pages show who else is looking at them, and Desks warns when someone is editing the layout.
 
 **Admin**
-- Teams, offices, public holidays, and **Settings > Access & Roles**: who is an admin, and which job titles can lead
-  teams and read the audit log.
+- Teams (team leads can add and edit them too), offices, public holidays, and **Settings > Access & Roles**: who is an
+  admin, and which job titles can lead teams and read the audit log.
 - An **Audit log** of every change: who, what, when and the details.
 
 See [ROLES-AND-AUDIT.md](ROLES-AND-AUDIT.md) for exactly who can do what.
@@ -227,7 +227,7 @@ unless the person's role allows them (see [ROLES-AND-AUDIT.md](ROLES-AND-AUDIT.m
 | `GET, POST /api/bookings`, `PUT, DELETE /api/bookings/:id` | Team bookings on the Calendar | Admins and team leads |
 | `GET /api/bookings/:id/ics` | One booking as a calendar file | |
 | `POST /api/locations`, `PUT, DELETE /api/locations/:id` | Offices | Admins |
-| `POST /api/teams`, `PUT, DELETE /api/teams/:id` | Teams | Admins |
+| `POST /api/teams`, `PUT, DELETE /api/teams/:id` | Teams | Add and edit: admins and team leads. Delete: admins |
 | `GET /api/holidays/fetch/:year`, `POST /api/holidays`, `DELETE /api/holidays/:date` | Public holidays | Admins |
 | `GET, POST /api/desks`, `PUT, DELETE /api/desks/:id` | Desks | Admins |
 | `GET, POST /api/floor-elements`, `PUT, DELETE /api/floor-elements/:id` | Rooms, walls and labels | Admins |

@@ -40,7 +40,7 @@ jest.mock('../../config/supabase', () => {
     return { supabase: { from: builder } };
 });
 
-const { attachPermissions, requireAdmin, requireCalendarAccess, onWrites } = require('../../middleware/permissions');
+const { attachPermissions, requireAdmin, requireCalendarAccess, onWrites, teamWrites } = require('../../middleware/permissions');
 const { auditWrites, sanitize } = require('../../middleware/audit');
 const graphIdentity = require('../../utils/graphIdentity');
 const { invalidateConfig } = require('../../utils/permissions');
@@ -61,7 +61,8 @@ function makeApp() {
     const ok = (req, res) => res.status(201).json({ id: 'new-1' });
     app.use('/api/me', meRoutes);
     app.use('/api/audit', auditRoutes);
-    app.use('/api/teams', onWrites(requireAdmin), express.Router().use(ok));
+    app.use('/api/teams', teamWrites, express.Router().use(ok));
+    app.use('/api/locations', onWrites(requireAdmin), express.Router().use(ok));
     app.use('/api/bookings', onWrites(requireCalendarAccess), express.Router().use(ok));
     app.use('/api/desk-bookings', express.Router().use(ok));
     return app;
@@ -100,12 +101,34 @@ describe('roles and audit log (REQUIRE_AUTH=true)', () => {
     afterEach(() => { delete process.env.REQUIRE_AUTH; delete process.env.ADMIN_EMAILS; delete global.fetch; });
 
     describe('who can change what', () => {
-        test('admins (from ADMIN_EMAILS) can change teams, others cannot', async () => {
-            expect((await request(app).post('/api/teams').set(who(ADMIN)).send({})).status).toBe(201);
-            const staff = await request(app).post('/api/teams').set(who(STAFF)).send({});
+        test('admins (from ADMIN_EMAILS) can change admin-only things, others cannot', async () => {
+            expect((await request(app).post('/api/locations').set(who(ADMIN)).send({})).status).toBe(201);
+            const staff = await request(app).post('/api/locations').set(who(STAFF)).send({});
             expect(staff.status).toBe(403);
             expect(staff.body.code).toBe('FORBIDDEN');
-            expect((await request(app).post('/api/teams').set(who(MANAGER)).send({})).status).toBe(403);
+            expect((await request(app).post('/api/locations').set(who(MANAGER)).send({})).status).toBe(403);
+        });
+
+        test('team leads can add and edit teams, but only admins can delete them', async () => {
+            expect((await request(app).post('/api/teams').set(who(MANAGER)).send({})).status).toBe(201);
+            expect((await request(app).put('/api/teams/t1').set(who(MANAGER)).send({})).status).toBe(201);
+            const del = await request(app).delete('/api/teams/t1').set(who(MANAGER));
+            expect(del.status).toBe(403);
+            expect(del.body.code).toBe('FORBIDDEN');
+            expect((await request(app).delete('/api/teams/t1').set(who(ADMIN))).status).toBe(201);
+        });
+
+        test('people without a team lead job title cannot add, edit or delete teams', async () => {
+            for (const [method, path] of [['post', '/api/teams'], ['put', '/api/teams/t1'], ['delete', '/api/teams/t1']]) {
+                expect((await request(app)[method](path).set(who(STAFF)).send({})).status).toBe(403);
+            }
+        });
+
+        test('a team lead whose job title is not verified yet is asked to verify it, not refused', async () => {
+            graphIdentity.clearCache();
+            const res = await request(app).post('/api/teams').set(who(MANAGER)).send({});
+            expect(res.status).toBe(403);
+            expect(res.body.code).toBe('IDENTITY_UNVERIFIED');
         });
 
         test('admins listed in the admin_emails setting count too, and the change applies at once', async () => {

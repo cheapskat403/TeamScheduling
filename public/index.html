@@ -256,8 +256,8 @@
                     Audit log
                 </button>
 
-                <!-- Settings Menu with Submenu (admins only) -->
-                <div class="nav-item-group admin-only">
+                <!-- Settings Menu with Submenu (admins; team leads see only Teams) -->
+                <div class="nav-item-group lead-or-admin">
                     <button class="nav-item has-submenu" id="settingsToggle">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="3"></circle>
@@ -279,14 +279,14 @@
                             Teams
                         </button>
                         
-                        <button class="nav-item nav-subitem" data-view="locations">
+                        <button class="nav-item nav-subitem admin-only" data-view="locations">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                                 <circle cx="12" cy="10" r="3"></circle>
                             </svg>
                             Locations
                         </button>
-                        <button class="nav-item nav-subitem" data-view="holidays">
+                        <button class="nav-item nav-subitem admin-only" data-view="holidays">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                                 <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -296,7 +296,7 @@
                             </svg>
                             Holidays
                         </button>
-                        <button class="nav-item nav-subitem" data-view="access">
+                        <button class="nav-item nav-subitem admin-only" data-view="access">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                             Access
                         </button>
@@ -589,7 +589,7 @@
 
                 <section class="access-card">
                     <h2>Job title permissions</h2>
-                    <p class="section-hint">Job titles come from Azure AD. <strong>Lead teams &amp; Calendar bookings</strong> lets that person be chosen as a team manager and make Calendar bookings. <strong>Audit log</strong> lets them read the audit log.</p>
+                    <p class="section-hint">Job titles come from Azure AD. <strong>Lead teams &amp; Calendar bookings</strong> lets that person be chosen as a team manager, add and edit teams, and make Calendar bookings. <strong>Audit log</strong> lets them read the audit log.</p>
                     <div class="perm-toolbar">
                         <input id="permSearch" type="search" placeholder="Search job titles" aria-label="Search job titles" maxlength="100">
                         <label class="perm-only"><input id="permOnlySelected" type="checkbox"> Only show selected</label>
