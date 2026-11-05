@@ -4278,6 +4278,11 @@ form {
     animation: spin 0.8s linear infinite;
 }
 
+.page-spinner.visible.immediate {
+    animation: none;
+    opacity: 1;
+}
+
 @keyframes page-spinner-in {
     to { opacity: 1; }
 }

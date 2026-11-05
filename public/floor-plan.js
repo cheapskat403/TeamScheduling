@@ -233,7 +233,7 @@ async function loadDesks() {
 
 /** Load with the page covered until everything is in: for opening another floor or week, not for refreshes */
 function loadDesksWithSpinner() {
-    return window.withPageSpinner ? window.withPageSpinner(loadDesks) : loadDesks();
+    return window.withPageSpinner ? window.withPageSpinner(loadDesks, { immediate: true }) : loadDesks();
 }
 
 function renderAllDesks() {

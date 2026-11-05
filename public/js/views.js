@@ -92,15 +92,15 @@ export async function switchView(viewName, { updateUrl = true } = {}) {
             
         // These pages fetch their data when opened: cover them until it is all in
         case 'desks':
-            await withPageSpinner(loadFloorPlanModule);
+            await withPageSpinner(loadFloorPlanModule, { immediate: true });
             break;
             
         case 'audit':
-            await withPageSpinner(initAuditView);
+            await withPageSpinner(initAuditView, { immediate: true });
             break;
 
         case 'access':
-            await withPageSpinner(initAccessView);
+            await withPageSpinner(initAccessView, { immediate: true });
             break;
     }
 }
